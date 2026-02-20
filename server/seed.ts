@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { teams, questions } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { log } from "./index";
 
 const teamsData = [
@@ -366,7 +367,13 @@ export async function seedDatabase() {
   try {
     const existingTeams = await db.select().from(teams);
     if (existingTeams.length > 0) {
-      log("Database already seeded, skipping", "seed");
+      log("Teams exist, syncing team names...", "seed");
+      for (const teamData of teamsData) {
+        await db.update(teams)
+          .set({ nameEn: teamData.nameEn, nameAr: teamData.nameAr, captain: teamData.captain, members: teamData.members })
+          .where(eq(teams.color, teamData.color));
+      }
+      log("Team names synced successfully", "seed");
       return;
     }
 
