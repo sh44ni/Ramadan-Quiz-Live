@@ -1,0 +1,187 @@
+Create a professional live Ramadan quiz competition web application with modern UI/UX and full Arabic/English multilingual support.
+
+**TECHNOLOGY STACK:**
+- Frontend: Next.js 14 with TypeScript
+- UI Framework: shadcn/ui components with Tailwind CSS
+- Backend: Node.js/Express with Socket.IO for real-time features
+- Database: SQLite with Prisma ORM
+- Icons: Lucide React icons + React Icons for Islamic symbols
+- Internationalization: next-i18next for Arabic/English translation
+- State Management: Zustand for client state
+- Animations: Framer Motion for smooth transitions
+
+**CORE FEATURES:**
+
+**1. REAL-TIME QUIZ SYSTEM:**
+- 6 predefined teams competing simultaneously
+- 30 questions total (5 questions per team)
+- Interactive question selection grid (1-30 numbered buttons)
+- 30-second countdown timer with visual/audio alerts
+- Real-time score tracking and live leaderboard
+- Turn-based system with automatic team rotation
+- WebSocket connections for instant updates across all devices
+
+**2. MULTILINGUAL SUPPORT:**
+- Complete Arabic (RTL) and English (LTR) language switching
+- Direction-aware layouts that flip properly for Arabic
+- All text content in both languages including:
+  - UI labels, buttons, messages
+  - Team names, questions, answers
+  - Admin panel content
+  - Error messages and notifications
+- Language toggle in header with Arabic/English flags
+- Persistent language preference in localStorage
+
+**3. RESPONSIVE UI DESIGN:**
+
+**Desktop Layout:**
+- Header with logo, language toggle, and current team indicator
+- Main grid showing question numbers (6x5 grid, beautifully styled)
+- Live scoreboard sidebar with team rankings
+- Question display area with timer and multiple choice options
+- Admin control panel (floating or sidebar)
+
+**Mobile Layout (Priority):**
+- Collapsible navigation with hamburger menu
+- Stacked layout for question grid (responsive grid)
+- Full-screen question view with large touch-friendly buttons
+- Swipeable team scoreboard
+- Bottom navigation for key actions
+- Optimized for phones and tablets
+
+**4. SHADCN/UI COMPONENTS TO USE:**
+- Button variants for different states (primary, secondary, destructive)
+- Card components for team displays and questions
+- Badge components for team scores and status
+- Alert components for game notifications
+- Tabs for different views (game, admin, scoreboard)
+- Dialog/Modal for question display
+- Progress bars for timer visualization
+- Sheet component for mobile navigation
+- Separator components for clean layouts
+- Avatar components for team representations
+
+**5. RAMADAN/ISLAMIC THEMING:**
+- Color scheme: Deep blues, gold accents, cream backgrounds
+- Islamic geometric patterns as subtle backgrounds
+- Crescent moon and star icons
+- Mosque silhouettes in headers
+- Arabic calligraphy-style fonts for Arabic text
+- Lantern icons for Ramadan theme
+- Gradient overlays with Islamic colors
+- Custom CSS animations for prayer/celebration moments
+
+**6. GAME FLOW & INTERACTIONS:**
+
+**Pre-Game:**
+- Welcome screen with language selection
+- Admin login with simple password protection
+- Team setup verification screen
+- Game rules display in both languages
+
+**During Game:**
+- Current team highlight with pulsing animation
+- Question selection with hover effects and disabled states
+- Timer with color changes (green → yellow → red)
+- Answer submission with loading states
+- Correct/incorrect feedback with animations
+- Score update animations with confetti effects
+- Automatic turn progression with transition effects
+
+**Post-Game:**
+- Final leaderboard with celebration animations
+- Statistics display (correct/incorrect per team)
+- Export results functionality
+- Reset game option for admin
+
+**7. ADMIN PANEL FEATURES:**
+- Dashboard with game overview
+- Question management (CRUD operations)
+- Team management and member details
+- Game controls (start, pause, reset, skip question)
+- Real-time monitoring of all team screens
+- Manual score adjustments if needed
+- Game settings (timer duration, question randomization)
+- Export game data as PDF/Excel
+
+**8. DATABASE SCHEMA:**
+```sql
+Teams: id, name_en, name_ar, color, members
+Questions: id, text_en, text_ar, option_a_en, option_a_ar, option_b_en, option_b_ar, option_c_en, option_c_ar, option_d_en, option_d_ar, correct_answer, category_en, category_ar, difficulty
+GameSessions: id, created_at, status, current_team, current_question
+TeamScores: id, team_id, session_id, score, questions_answered
+QuestionHistory: id, session_id, team_id, question_id, answer_given, is_correct, timestamp
+```
+
+**9. PREDEFINED TEAMS DATA:**
+```javascript
+const teams = [
+  { id: 1, name_en: "Conference 1 - Friday", name_ar: "المؤتمر (1) - الجمعة", color: "#3B82F6", captain: "الرئيس محمد" },
+  { id: 2, name_en: "Conference 2 - Friday", name_ar: "المؤتمر (2) - الجمعة", color: "#10B981", captain: "عمر سعيد" },
+  { id: 3, name_en: "Conference 3 - Flag People", name_ar: "المؤتمر (3) - أهل الراية", color: "#F59E0B", captain: "حاتم سعيد" },
+  { id: 4, name_en: "Conference 4 - Friday", name_ar: "المؤتمر (4) - الجمعة", color: "#EF4444", captain: "حامد محمد" },
+  { id: 5, name_en: "Conference 5 - Falaj Jarah", name_ar: "المؤتمر (5) - فلج جارة", color: "#8B5CF6", captain: "غيث سعيد" },
+  { id: 6, name_en: "Conference 6 - God's Mercy", name_ar: "المؤتمر (6) - مراحي الله", color: "#F97316", captain: "حميد خالد" }
+];
+```
+
+**10. SAMPLE QUESTIONS (Include these):**
+Create 30+ sample questions covering:
+- Islamic/Religious knowledge (Quran, Hadith, Islamic history)
+- Omani culture and history
+- Arabic language and literature
+- General knowledge appropriate for the audience
+All questions in both Arabic and English with 4 multiple choice options
+
+**11. TECHNICAL REQUIREMENTS:**
+
+**Performance:**
+- Code splitting for faster load times
+- Image optimization for all graphics
+- Lazy loading for non-critical components
+- Service Worker for offline functionality (basic)
+
+**Real-time Features:**
+- Socket.IO implementation with room management
+- Automatic reconnection handling
+- Offline state detection and handling
+- Conflict resolution for simultaneous actions
+
+**Security:**
+- Input validation and sanitization
+- XSS protection
+- CORS configuration
+- Rate limiting for API endpoints
+- Admin authentication with JWT
+
+**12. RESPONSIVE BREAKPOINTS:**
+- Mobile: 320px - 768px (priority design)
+- Tablet: 768px - 1024px
+- Desktop: 1024px+
+- Large screens: 1440px+
+
+**13. ACCESSIBILITY:**
+- WCAG 2.1 AA compliance
+- Keyboard navigation support
+- Screen reader compatibility
+- High contrast mode support
+- Focus indicators on all interactive elements
+- Arabic screen reader support
+
+**14. DEPLOYMENT CONFIGURATION:**
+- Environment variables for database and secrets
+- Docker containerization ready
+- Vercel deployment optimization
+- Database migration scripts
+- Production build optimization
+
+**ADDITIONAL FEATURES:**
+- Sound effects for timer alerts and correct answers
+- Confetti animations for correct answers
+- Photo gallery mode to display team photos
+- QR code generation for easy mobile access
+- Automatic backup of game data
+- Print-friendly scoreboard layouts
+- Social media sharing for results
+
+**FILE STRUCTURE:**
