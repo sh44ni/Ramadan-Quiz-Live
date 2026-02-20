@@ -11,7 +11,7 @@ export function MosqueHeader() {
     <header className="relative bg-white dark:bg-gray-950 border-b overflow-hidden">
       <div className="relative z-10 flex items-center justify-between gap-4 px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
-          <img src={logoImg} alt="Logo" className="h-10 w-10 rounded-full object-cover" data-testid="img-logo" />
+          <img src={logoImg} alt="Logo" className="h-12 object-contain" data-testid="img-logo" />
         </div>
 
         <Button
