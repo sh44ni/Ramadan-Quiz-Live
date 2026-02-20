@@ -73,3 +73,26 @@ export type TeamScore = typeof teamScores.$inferSelect;
 export type InsertTeamScore = z.infer<typeof insertTeamScoreSchema>;
 export type QuestionHistory = typeof questionHistory.$inferSelect;
 export type InsertQuestionHistory = z.infer<typeof insertQuestionHistorySchema>;
+
+export const authorizedEmails = pgTable("authorized_emails", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const otpCodes = pgTable("otp_codes", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+});
+
+export const insertAuthorizedEmailSchema = createInsertSchema(authorizedEmails).omit({ id: true, addedAt: true });
+export const insertOtpCodeSchema = createInsertSchema(otpCodes).omit({ id: true });
+
+export type AuthorizedEmail = typeof authorizedEmails.$inferSelect;
+export type InsertAuthorizedEmail = z.infer<typeof insertAuthorizedEmailSchema>;
+export type OtpCode = typeof otpCodes.$inferSelect;
+export type InsertOtpCode = z.infer<typeof insertOtpCodeSchema>;

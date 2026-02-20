@@ -1,8 +1,9 @@
-import { Moon, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import logoImg from "@assets/logoo_1771549026301.png";
 
 function MosqueSilhouette() {
   return (
@@ -49,12 +50,7 @@ export function MosqueHeader() {
 
       <div className="relative z-10 flex items-center justify-between gap-4 px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
-          <motion.div
-            animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <Moon className="h-7 w-7 text-amber-300 fill-amber-300" />
-          </motion.div>
+          <img src={logoImg} alt="Logo" className="h-10 w-10 rounded-full object-cover" data-testid="img-logo" />
           <div>
             <h1
               className={`text-lg md:text-xl font-bold tracking-tight ${isRTL ? "font-arabic" : ""}`}

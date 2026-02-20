@@ -1,12 +1,15 @@
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import {
   teams, questions, gameSessions, teamScores, questionHistory,
+  authorizedEmails, otpCodes,
   type Team, type InsertTeam,
   type Question, type InsertQuestion,
   type GameSession, type InsertGameSession,
   type TeamScore, type InsertTeamScore,
   type QuestionHistory, type InsertQuestionHistory,
+  type AuthorizedEmail, type InsertAuthorizedEmail,
+  type OtpCode, type InsertOtpCode,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -32,6 +35,15 @@ export interface IStorage {
   createQuestionHistory(history: InsertQuestionHistory): Promise<QuestionHistory>;
 
   getAnsweredQuestionIds(sessionId: number): Promise<number[]>;
+
+  getAuthorizedEmails(): Promise<AuthorizedEmail[]>;
+  getAuthorizedEmail(email: string): Promise<AuthorizedEmail | undefined>;
+  addAuthorizedEmail(data: InsertAuthorizedEmail): Promise<AuthorizedEmail>;
+  removeAuthorizedEmail(id: number): Promise<void>;
+
+  createOtpCode(data: InsertOtpCode): Promise<OtpCode>;
+  getValidOtp(email: string, code: string): Promise<OtpCode | undefined>;
+  markOtpUsed(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -156,6 +168,48 @@ export class DatabaseStorage implements IStorage {
       .from(questionHistory)
       .where(eq(questionHistory.sessionId, sessionId));
     return history.map((h) => h.questionId);
+  }
+
+  async getAuthorizedEmails(): Promise<AuthorizedEmail[]> {
+    return db.select().from(authorizedEmails);
+  }
+
+  async getAuthorizedEmail(email: string): Promise<AuthorizedEmail | undefined> {
+    const [result] = await db.select().from(authorizedEmails).where(eq(authorizedEmails.email, email.toLowerCase()));
+    return result;
+  }
+
+  async addAuthorizedEmail(data: InsertAuthorizedEmail): Promise<AuthorizedEmail> {
+    const [created] = await db.insert(authorizedEmails).values({ ...data, email: data.email.toLowerCase() }).returning();
+    return created;
+  }
+
+  async removeAuthorizedEmail(id: number): Promise<void> {
+    await db.delete(authorizedEmails).where(eq(authorizedEmails.id, id));
+  }
+
+  async createOtpCode(data: InsertOtpCode): Promise<OtpCode> {
+    const [created] = await db.insert(otpCodes).values(data).returning();
+    return created;
+  }
+
+  async getValidOtp(email: string, code: string): Promise<OtpCode | undefined> {
+    const now = new Date();
+    const results = await db
+      .select()
+      .from(otpCodes)
+      .where(
+        and(
+          eq(otpCodes.email, email.toLowerCase()),
+          eq(otpCodes.code, code),
+          eq(otpCodes.used, false)
+        )
+      );
+    return results.find(r => r.expiresAt > now);
+  }
+
+  async markOtpUsed(id: number): Promise<void> {
+    await db.update(otpCodes).set({ used: true }).where(eq(otpCodes.id, id));
   }
 }
 
