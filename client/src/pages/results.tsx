@@ -119,6 +119,18 @@ export default function Results() {
                     <h3 className={`font-bold truncate ${isRTL ? "font-arabic" : ""}`}>
                       {language === "ar" ? result.team.nameAr : result.team.nameEn}
                     </h3>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                      <Crown className="h-3 w-3 text-amber-500" />
+                      <span className="font-arabic">{result.team.captain}</span>
+                      {result.team.members && result.team.members.length > 0 && (
+                        <>
+                          <span className="mx-1">·</span>
+                          <span className="font-arabic truncate">
+                            {result.team.members.join(" · ")}
+                          </span>
+                        </>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                       <span>
                         {t("questionsAnswered")}: {result.questionsAnswered}

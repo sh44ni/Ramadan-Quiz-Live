@@ -147,7 +147,14 @@ export async function registerRoutes(
       const token = crypto.randomBytes(32).toString("hex");
       playerTokens.set(token, normalizedEmail);
 
-      res.json({ success: true, token, email: normalizedEmail });
+      const authorized = await storage.getAuthorizedEmail(normalizedEmail);
+      res.json({
+        success: true,
+        token,
+        email: normalizedEmail,
+        playerName: authorized?.playerName || authorized?.name,
+        teamId: authorized?.teamId,
+      });
     } catch (error) {
       res.status(500).json({ message: "Verification failed" });
     }
@@ -159,7 +166,13 @@ export async function registerRoutes(
       const email = playerTokens.get(token)!;
       const authorized = await storage.getAuthorizedEmail(email);
       if (authorized) {
-        return res.json({ valid: true, email, name: authorized.name });
+        return res.json({
+          valid: true,
+          email,
+          name: authorized.name,
+          playerName: authorized.playerName,
+          teamId: authorized.teamId,
+        });
       }
     }
     res.json({ valid: false });
@@ -176,13 +189,18 @@ export async function registerRoutes(
 
   app.post("/api/admin/authorized-emails", requireAdmin, async (req, res) => {
     try {
-      const { email, name } = req.body;
+      const { email, name, playerName, teamId } = req.body;
       if (!email || !name) return res.status(400).json({ message: "Email and name are required" });
 
       const existing = await storage.getAuthorizedEmail(email);
       if (existing) return res.status(409).json({ message: "Email already authorized" });
 
-      const created = await storage.addAuthorizedEmail({ email, name });
+      const created = await storage.addAuthorizedEmail({
+        email,
+        name,
+        playerName: playerName || null,
+        teamId: teamId ? parseInt(teamId) : null,
+      });
       res.json(created);
     } catch (error) {
       res.status(500).json({ message: "Failed to add authorized email" });

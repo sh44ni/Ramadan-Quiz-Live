@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Moon, ArrowLeft, Lock } from "lucide-react";
+import { Users, Moon, ArrowLeft, Lock, Crown } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
@@ -280,13 +280,25 @@ export default function Game() {
                   </h2>
                 </div>
               </div>
-              <Badge
-                variant="outline"
-                className="text-xs"
-                style={{ borderColor: currentTeam.color, color: currentTeam.color }}
-              >
-                {t("captain")}: {currentTeam.captain}
-              </Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge
+                  variant="outline"
+                  className="text-xs"
+                  style={{ borderColor: currentTeam.color, color: currentTeam.color }}
+                >
+                  <Crown className="h-3 w-3 me-1 text-amber-500" />
+                  {t("captain")}: {currentTeam.captain}
+                </Badge>
+                {currentTeam.members && currentTeam.members.length > 0 && (
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {currentTeam.members.map((member, idx) => (
+                      <span key={idx} className="text-xs text-muted-foreground font-arabic">
+                        {member}{idx < currentTeam.members.length - 1 ? " ·" : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </motion.div>

@@ -99,14 +99,21 @@ export function Scoreboard({ teams, scores, currentTeamId, compact = false }: Sc
                     )}
                   </motion.div>
                 </div>
-                {!compact && teamScore && (
-                  <div className="flex items-center gap-3 mt-1.5 ms-8 text-[11px] text-muted-foreground">
-                    <span>
-                      {t("questionsAnswered")}: {teamScore.questionsAnswered}
-                    </span>
-                    <span>
-                      {t("correctAnswers")}: {teamScore.correctAnswers}
-                    </span>
+                {!compact && (
+                  <div className="ms-8 mt-1">
+                    <div className="text-[11px] text-muted-foreground font-arabic">
+                      {t("captain")}: {team.captain}
+                    </div>
+                    {teamScore && (
+                      <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                        <span>
+                          {t("questionsAnswered")}: {teamScore.questionsAnswered}
+                        </span>
+                        <span>
+                          {t("correctAnswers")}: {teamScore.correctAnswers}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>

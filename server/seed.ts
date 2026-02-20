@@ -3,12 +3,36 @@ import { teams, questions } from "@shared/schema";
 import { log } from "./index";
 
 const teamsData = [
-  { nameEn: "Conference 1 - Friday", nameAr: "المؤتمر (1) - الجمعة", color: "#3B82F6", captain: "الرئيس محمد" },
-  { nameEn: "Conference 2 - Friday", nameAr: "المؤتمر (2) - الجمعة", color: "#10B981", captain: "عمر سعيد" },
-  { nameEn: "Conference 3 - Flag People", nameAr: "المؤتمر (3) - أهل الراية", color: "#F59E0B", captain: "حاتم سعيد" },
-  { nameEn: "Conference 4 - Friday", nameAr: "المؤتمر (4) - الجمعة", color: "#EF4444", captain: "حامد محمد" },
-  { nameEn: "Conference 5 - Falaj Jarah", nameAr: "المؤتمر (5) - فلج جارة", color: "#8B5CF6", captain: "غيث سعيد" },
-  { nameEn: "Conference 6 - God's Mercy", nameAr: "المؤتمر (6) - مراحي الله", color: "#F97316", captain: "حميد خالد" },
+  {
+    nameEn: "Al-Bidaya", nameAr: "البداية", color: "#3B82F6",
+    captain: "مهاجر محمد",
+    members: ["حامد محمد", "حازم محمد", "محمد سعيد (أبو مهاجر)"],
+  },
+  {
+    nameEn: "Al-Falah", nameAr: "الفلاح", color: "#10B981",
+    captain: "عمر سعيد",
+    members: ["غيث سعيد", "حاتم سعيد", "فلاح السعيدي"],
+  },
+  {
+    nameEn: "Ahl Al-Raya", nameAr: "أهل الراية", color: "#F59E0B",
+    captain: "حاتم سعيد",
+    members: ["عصام سعيد", "محمود سعيد", "عبد الله سعيد"],
+  },
+  {
+    nameEn: "Al-Nukhba", nameAr: "النخبة", color: "#EF4444",
+    captain: "أحمد علي حمدان",
+    members: ["معتز سعيد", "الوارث مبارك", "مصباح"],
+  },
+  {
+    nameEn: "Falaj Ghurba", nameAr: "فلج غربة", color: "#8B5CF6",
+    captain: "فهد محمد",
+    members: ["فايز سيف", "نبيل سيف", "هشام سيف"],
+  },
+  {
+    nameEn: "Marsa Al-Fikr", nameAr: "مرسى الفكر", color: "#F97316",
+    captain: "حميد خالد",
+    members: ["عمر ساعد", "إبراهيم المكتومي", "أبو مصعب"],
+  },
 ];
 
 const questionsData = [

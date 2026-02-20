@@ -50,7 +50,8 @@ export default function Login() {
       const data = await res.json();
       localStorage.setItem("playerToken", data.token);
       localStorage.setItem("playerEmail", data.email);
-      toast({ title: t("loginSuccess"), description: t("welcomePlayer") });
+      if (data.playerName) localStorage.setItem("playerName", data.playerName);
+      toast({ title: t("loginSuccess"), description: data.playerName ? `${t("welcomePlayer")} ${data.playerName}` : t("welcomePlayer") });
       setLocation("/game");
     } catch (error) {
       toast({ title: t("error"), description: t("invalidOtp"), variant: "destructive" });

@@ -9,6 +9,7 @@ export const teams = pgTable("teams", {
   nameAr: text("name_ar").notNull(),
   color: text("color").notNull(),
   captain: text("captain").notNull(),
+  members: text("members").array().notNull().default(sql`'{}'::text[]`),
 });
 
 export const questions = pgTable("questions", {
@@ -78,6 +79,8 @@ export const authorizedEmails = pgTable("authorized_emails", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  playerName: text("player_name"),
+  teamId: integer("team_id"),
   addedAt: timestamp("added_at").defaultNow(),
 });
 
