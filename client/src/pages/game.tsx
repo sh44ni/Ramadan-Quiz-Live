@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Moon, ArrowLeft } from "lucide-react";
+import { Users, Moon, ArrowLeft, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
@@ -26,13 +26,39 @@ export default function Game() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
   const lastQuestionIdRef = useRef<number | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem("playerToken");
+      if (!token) {
+        setAuthChecked(true);
+        setIsAuthorized(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/verify-token", {
+          headers: { "x-player-token": token },
+        });
+        const data = await res.json();
+        setIsAuthorized(data.valid);
+      } catch {
+        setIsAuthorized(false);
+      }
+      setAuthChecked(true);
+    };
+    checkAuth();
+  }, []);
 
   const { data: teamsData, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
+    enabled: isAuthorized,
   });
 
   const { data: questionsData, isLoading: questionsLoading } = useQuery<Question[]>({
     queryKey: ["/api/questions"],
+    enabled: isAuthorized,
   });
 
   const { data: sessionData, isLoading: sessionLoading } = useQuery<{
@@ -42,6 +68,7 @@ export default function Game() {
   } | null>({
     queryKey: ["/api/game/current"],
     refetchInterval: 1500,
+    enabled: isAuthorized,
   });
 
   const session = sessionData?.session || null;
@@ -143,6 +170,41 @@ export default function Game() {
   }, [currentQuestion, session]);
 
   const isLoading = teamsLoading || questionsLoading || sessionLoading;
+
+  if (!authChecked) {
+    return (
+      <div className="p-4 md:p-6 space-y-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] p-4 islamic-pattern">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-4"
+        >
+          <Lock className="h-16 w-16 text-muted-foreground mx-auto" />
+          <h2
+            className={`text-2xl font-bold ${isRTL ? "font-arabic" : ""}`}
+            data-testid="text-auth-required"
+          >
+            {t("authRequired")}
+          </h2>
+          <p className={`text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+            {t("authRequiredDesc")}
+          </p>
+          <Button onClick={() => setLocation("/login")} data-testid="button-go-login">
+            <span className={isRTL ? "font-arabic" : ""}>{t("playerLogin")}</span>
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

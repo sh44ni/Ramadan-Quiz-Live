@@ -25,8 +25,12 @@ import {
   Minus,
   Eye,
   SkipForward,
+  Mail,
+  Trash2,
+  Send,
+  Loader2,
 } from "lucide-react";
-import type { Team, GameSession, TeamScore } from "@shared/schema";
+import type { Team, GameSession, TeamScore, AuthorizedEmail } from "@shared/schema";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -37,6 +41,8 @@ export default function Admin() {
   const [adminToken, setAdminToken] = useState("");
   const [password, setPassword] = useState("");
   const [scoreAdjust, setScoreAdjust] = useState<Record<number, number>>({});
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -64,6 +70,15 @@ export default function Admin() {
   const { data: teamsData, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
     enabled: isAuthenticated,
+  });
+
+  const { data: authorizedEmailsData } = useQuery<AuthorizedEmail[]>({
+    queryKey: ["/api/admin/authorized-emails"],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const res = await adminFetch("GET", "/api/admin/authorized-emails");
+      return res.json();
+    },
   });
 
   const loginMutation = useMutation({
@@ -112,6 +127,54 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
+    },
+  });
+
+  const addEmailMutation = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch("POST", "/api/admin/authorized-emails", {
+        email: newEmail.trim(),
+        name: newName.trim(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/authorized-emails"] });
+      setNewEmail("");
+      setNewName("");
+      toast({ title: t("emailAdded"), description: t("emailAddedDesc") });
+    },
+    onError: (error: Error) => {
+      const msg = error.message;
+      if (msg.includes("409")) {
+        toast({ title: t("error"), description: t("emailExists"), variant: "destructive" });
+      } else {
+        toast({ title: t("error"), description: msg, variant: "destructive" });
+      }
+    },
+  });
+
+  const removeEmailMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminFetch("DELETE", `/api/admin/authorized-emails/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/authorized-emails"] });
+      toast({ title: t("emailRemoved"), description: t("emailRemovedDesc") });
+    },
+  });
+
+  const sendInvitationMutation = useMutation({
+    mutationFn: async ({ email, name }: { email: string; name: string }) => {
+      const res = await adminFetch("POST", "/api/admin/send-invitation", { email, name });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: t("invitationSent"), description: t("invitationSentDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -174,6 +237,7 @@ export default function Admin() {
   const session = sessionData?.session;
   const scores = sessionData?.scores || [];
   const teams = teamsData || [];
+  const authorizedEmails = authorizedEmailsData || [];
 
   const isLoading = sessionLoading || teamsLoading;
 
@@ -352,6 +416,84 @@ export default function Admin() {
               </div>
             ))}
           </div>
+        </Card>
+
+        <Card className="p-4 space-y-4 lg:col-span-2">
+          <h3
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+          >
+            <Mail className="h-4 w-4 inline-block me-2" />
+            {t("manageEmails")}
+          </h3>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              type="email"
+              placeholder={t("emailAddress")}
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              dir="ltr"
+              data-testid="input-new-email"
+            />
+            <Input
+              type="text"
+              placeholder={t("playerName")}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              data-testid="input-new-name"
+            />
+            <Button
+              onClick={() => addEmailMutation.mutate()}
+              disabled={addEmailMutation.isPending || !newEmail.trim() || !newName.trim()}
+              className="shrink-0"
+              data-testid="button-add-email"
+            >
+              {addEmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              <span className={isRTL ? "font-arabic" : ""}>{t("addEmail")}</span>
+            </Button>
+          </div>
+
+          {authorizedEmails.length === 0 ? (
+            <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>
+              {t("noAuthorizedEmails")}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {authorizedEmails.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
+                  data-testid={`email-entry-${entry.id}`}
+                >
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground truncate" dir="ltr">{entry.email}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => sendInvitationMutation.mutate({ email: entry.email, name: entry.name })}
+                      disabled={sendInvitationMutation.isPending}
+                      data-testid={`button-send-invitation-${entry.id}`}
+                    >
+                      {sendInvitationMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => removeEmailMutation.mutate(entry.id)}
+                      disabled={removeEmailMutation.isPending}
+                      data-testid={`button-remove-email-${entry.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

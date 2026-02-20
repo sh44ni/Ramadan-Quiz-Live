@@ -82,12 +82,12 @@ export default function Welcome() {
         <div className="flex flex-col gap-3">
           <Button
             size="lg"
-            onClick={() => setLocation("/game")}
+            onClick={() => setLocation("/login")}
             className="w-full"
-            data-testid="button-view-game"
+            data-testid="button-player-login"
           >
             <Trophy className="h-4 w-4" />
-            <span className={isRTL ? "font-arabic" : ""}>{t("viewGame")}</span>
+            <span className={isRTL ? "font-arabic" : ""}>{t("playerLogin")}</span>
           </Button>
           <Button
             variant="outline"

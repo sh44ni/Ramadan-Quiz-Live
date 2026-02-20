@@ -9,6 +9,7 @@ import Welcome from "@/pages/welcome";
 import Game from "@/pages/game";
 import Admin from "@/pages/admin";
 import Results from "@/pages/results";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import "./lib/i18n";
 
@@ -16,6 +17,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Welcome} />
+      <Route path="/login" component={Login} />
       <Route path="/game" component={Game} />
       <Route path="/admin" component={Admin} />
       <Route path="/results" component={Results} />

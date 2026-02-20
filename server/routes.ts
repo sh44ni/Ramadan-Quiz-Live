@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
 
-const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "jabaladmin431#";
 const adminTokens = new Set<string>();
 const playerTokens = new Map<string, string>();
 
@@ -191,7 +191,8 @@ export async function registerRoutes(
 
   app.delete("/api/admin/authorized-emails/:id", requireAdmin, async (req, res) => {
     try {
-      await storage.removeAuthorizedEmail(parseInt(req.params.id));
+      const id = req.params.id;
+      await storage.removeAuthorizedEmail(parseInt(id as string));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to remove authorized email" });
