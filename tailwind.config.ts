@@ -86,6 +86,8 @@ export default {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        arabic: ["'Cairo'", "'Tajawal'", "'Amiri'", "sans-serif"],
+        amiri: ["'Amiri'", "serif"],
       },
       keyframes: {
         "accordion-down": {

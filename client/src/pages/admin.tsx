@@ -1,0 +1,359 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/lib/useLanguage";
+import { useLocation } from "wouter";
+import { motion } from "framer-motion";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Scoreboard } from "@/components/scoreboard";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Square,
+  ArrowLeft,
+  Shield,
+  Lock,
+  Users,
+  Plus,
+  Minus,
+  Eye,
+  SkipForward,
+} from "lucide-react";
+import type { Team, GameSession, TeamScore } from "@shared/schema";
+
+export default function Admin() {
+  const { t } = useTranslation();
+  const { isRTL, language } = useLanguage();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminToken, setAdminToken] = useState("");
+  const [password, setPassword] = useState("");
+  const [scoreAdjust, setScoreAdjust] = useState<Record<number, number>>({});
+
+  const adminFetch = async (method: string, url: string, body?: unknown) => {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": adminToken,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res;
+  };
+
+  const { data: sessionData, isLoading: sessionLoading } = useQuery<{
+    session: GameSession;
+    scores: TeamScore[];
+    answeredQuestionIds: number[];
+  } | null>({
+    queryKey: ["/api/game/current"],
+    refetchInterval: 2000,
+    enabled: isAuthenticated,
+  });
+
+  const { data: teamsData, isLoading: teamsLoading } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
+    enabled: isAuthenticated,
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/login", { password });
+      return res.json();
+    },
+    onSuccess: (data: { token: string }) => {
+      setAdminToken(data.token);
+      setIsAuthenticated(true);
+      toast({ title: t("login"), description: "Authenticated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Invalid password", variant: "destructive" });
+    },
+  });
+
+  const gameActionMutation = useMutation({
+    mutationFn: async (action: string) => {
+      const res = await adminFetch("POST", `/api/game/${action}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const scoreAdjustMutation = useMutation({
+    mutationFn: async ({ teamId, points }: { teamId: number; points: number }) => {
+      const res = await adminFetch("POST", "/api/game/adjust-score", { teamId, points });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
+      setScoreAdjust({});
+    },
+  });
+
+  const skipMutation = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch("POST", "/api/game/skip");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
+    },
+  });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[calc(100vh-56px)] flex items-center justify-center p-4 islamic-pattern">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm"
+        >
+          <Card className="p-6 space-y-5">
+            <div className="text-center space-y-2">
+              <div className="flex justify-center">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Shield className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+              <h2 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>{t("adminLogin")}</h2>
+            </div>
+
+            <div className="space-y-3">
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder={t("password")}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loginMutation.mutate()}
+                  className="ps-10"
+                  data-testid="input-admin-password"
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => loginMutation.mutate()}
+                disabled={loginMutation.isPending || !password}
+                data-testid="button-admin-login"
+              >
+                {loginMutation.isPending ? "..." : t("login")}
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setLocation("/")}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("backToHome")}</span>
+            </Button>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  const session = sessionData?.session;
+  const scores = sessionData?.scores || [];
+  const teams = teamsData || [];
+
+  const isLoading = sessionLoading || teamsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  const statusColor =
+    session?.status === "active"
+      ? "text-emerald-500"
+      : session?.status === "paused"
+        ? "text-amber-500"
+        : session?.status === "finished"
+          ? "text-red-500"
+          : "text-muted-foreground";
+
+  const statusText =
+    session?.status === "active"
+      ? t("active")
+      : session?.status === "paused"
+        ? t("paused")
+        : session?.status === "finished"
+          ? t("finished")
+          : t("waiting");
+
+  return (
+    <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-56px)]">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => setLocation("/")} data-testid="button-back-admin">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`} data-testid="text-admin-title">
+            {t("admin")}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={statusColor} data-testid="text-game-status">
+            {statusText}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={() => setLocation("/game")} data-testid="button-view-game-admin">
+            <Eye className="h-4 w-4" />
+            <span className={isRTL ? "font-arabic" : ""}>{t("viewGame")}</span>
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="p-4 space-y-4">
+          <h3
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+          >
+            {t("gameControls")}
+          </h3>
+
+          <div className="grid grid-cols-2 gap-2">
+            {(!session || session.status === "waiting" || session.status === "finished") && (
+              <Button
+                onClick={() => gameActionMutation.mutate("start")}
+                disabled={gameActionMutation.isPending}
+                className="col-span-2"
+                data-testid="button-start-game"
+              >
+                <Play className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("startNewGame")}</span>
+              </Button>
+            )}
+
+            {session?.status === "active" && (
+              <Button
+                variant="secondary"
+                onClick={() => gameActionMutation.mutate("pause")}
+                disabled={gameActionMutation.isPending}
+                data-testid="button-pause"
+              >
+                <Pause className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("pauseGame")}</span>
+              </Button>
+            )}
+
+            {session?.status === "paused" && (
+              <Button
+                onClick={() => gameActionMutation.mutate("resume")}
+                disabled={gameActionMutation.isPending}
+                data-testid="button-resume"
+              >
+                <Play className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("resumeGame")}</span>
+              </Button>
+            )}
+
+            {session && session.status !== "waiting" && session.status !== "finished" && (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => skipMutation.mutate()}
+                  disabled={skipMutation.isPending}
+                  data-testid="button-skip"
+                >
+                  <SkipForward className="h-4 w-4" />
+                  <span className={isRTL ? "font-arabic" : ""}>{t("nextTeam")}</span>
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => gameActionMutation.mutate("end")}
+                  disabled={gameActionMutation.isPending}
+                  data-testid="button-end"
+                >
+                  <Square className="h-4 w-4" />
+                  <span className={isRTL ? "font-arabic" : ""}>{t("endGame")}</span>
+                </Button>
+              </>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={() => gameActionMutation.mutate("reset")}
+              disabled={gameActionMutation.isPending}
+              className={session && session.status !== "waiting" ? "" : "col-span-2"}
+              data-testid="button-reset"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} />
+        </Card>
+
+        <Card className="p-4 space-y-3 lg:col-span-2">
+          <h3
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+          >
+            {t("adjustScore")}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {teams.map((team) => (
+              <div
+                key={team.id}
+                className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
+              >
+                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                <span className={`text-sm font-medium flex-1 truncate ${isRTL ? "font-arabic" : ""}`}>
+                  {language === "ar" ? team.nameAr : team.nameEn}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      scoreAdjustMutation.mutate({ teamId: team.id, points: -10 })
+                    }
+                    data-testid={`button-remove-points-${team.id}`}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      scoreAdjustMutation.mutate({ teamId: team.id, points: 10 })
+                    }
+                    data-testid={`button-add-points-${team.id}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

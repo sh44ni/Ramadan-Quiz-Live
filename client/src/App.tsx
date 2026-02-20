@@ -3,14 +3,22 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { LanguageProvider } from "@/lib/useLanguage";
+import { MosqueHeader } from "@/components/mosque-header";
+import Welcome from "@/pages/welcome";
+import Game from "@/pages/game";
+import Admin from "@/pages/admin";
+import Results from "@/pages/results";
 import NotFound from "@/pages/not-found";
+import "./lib/i18n";
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={Welcome} />
+      <Route path="/game" component={Game} />
+      <Route path="/admin" component={Admin} />
+      <Route path="/results" component={Results} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -20,8 +28,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <LanguageProvider>
+          <div className="min-h-screen bg-background">
+            <MosqueHeader />
+            <Router />
+          </div>
+        </LanguageProvider>
         <Toaster />
-        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );
