@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Moon, Star, Users, Clock, Trophy, BookOpen, Sparkles } from "lucide-react";
+import { Moon, Star, Users, Clock, Trophy, BookOpen, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -151,6 +151,19 @@ export default function Welcome() {
                   <span className={`text-sm ${isRTL ? "font-arabic" : ""}`}>{rule.text}</span>
                 </motion.div>
               ))}
+            </div>
+
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setLocation("/rules")}
+                data-testid="button-learn-more"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("learnMore")}</span>
+                <ArrowRight className={`h-4 w-4 ${isRTL ? "rotate-180" : ""}`} />
+              </Button>
             </div>
           </Card>
         </div>
