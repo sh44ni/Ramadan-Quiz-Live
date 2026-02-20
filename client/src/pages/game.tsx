@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Moon, ArrowLeft, Lock, Crown } from "lucide-react";
+import { Users, Moon, ArrowLeft, Lock, Crown, Star, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
@@ -106,7 +106,6 @@ export default function Game() {
   const handleSelectQuestion = useCallback(
     async (questionId: number) => {
       if (!session) return;
-
       try {
         await apiRequest("POST", "/api/game/select-question", {
           sessionId: session.id,
@@ -123,10 +122,8 @@ export default function Game() {
   const handleAnswer = useCallback(
     async (answer: string) => {
       if (!currentQuestion || !session) return;
-
       setSelectedAnswer(answer);
       setTimerRunning(false);
-
       try {
         const res = await apiRequest("POST", "/api/game/answer", {
           sessionId: session.id,
@@ -136,7 +133,6 @@ export default function Game() {
         });
         const result = await res.json();
         setShowResult(result.isCorrect ? "correct" : "incorrect");
-
         setTimeout(() => {
           setShowResult(null);
           setSelectedAnswer(null);
@@ -151,9 +147,7 @@ export default function Game() {
 
   const handleTimeUp = useCallback(() => {
     if (!currentQuestion || !session) return;
-
     setTimerRunning(false);
-
     apiRequest("POST", "/api/game/answer", {
       sessionId: session.id,
       questionId: currentQuestion.id,
@@ -174,31 +168,38 @@ export default function Game() {
   if (!authChecked) {
     return (
       <div className="p-4 md:p-6 space-y-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-16 w-full rounded-md" />
+        <Skeleton className="h-48 w-full rounded-md" />
       </div>
     );
   }
 
   if (!isAuthorized) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] p-4 islamic-pattern">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] ramadan-gradient relative overflow-hidden">
+        <div className="mosque-silhouette opacity-15" />
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
+          className="text-center space-y-4 relative z-10 p-6"
         >
-          <Lock className="h-16 w-16 text-muted-foreground mx-auto" />
+          <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mx-auto">
+            <Lock className="h-10 w-10 text-amber-400" />
+          </div>
           <h2
-            className={`text-2xl font-bold ${isRTL ? "font-arabic" : ""}`}
+            className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}
             data-testid="text-auth-required"
           >
             {t("authRequired")}
           </h2>
-          <p className={`text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+          <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
             {t("authRequiredDesc")}
           </p>
-          <Button onClick={() => setLocation("/login")} data-testid="button-go-login">
+          <Button
+            onClick={() => setLocation("/login")}
+            className="gold-gradient border-amber-400/30 text-white font-bold"
+            data-testid="button-go-login"
+          >
             <span className={isRTL ? "font-arabic" : ""}>{t("playerLogin")}</span>
           </Button>
         </motion.div>
@@ -208,14 +209,14 @@ export default function Game() {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
-        <Skeleton className="h-16 w-full" />
+      <div className="p-4 md:p-6 space-y-4 islamic-pattern">
+        <Skeleton className="h-16 w-full rounded-md" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <Skeleton className="h-48 w-full" />
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-48 w-full rounded-md" />
+            <Skeleton className="h-64 w-full rounded-md" />
           </div>
-          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-96 w-full rounded-md" />
         </div>
       </div>
     );
@@ -223,23 +224,47 @@ export default function Game() {
 
   if (!session || session.status === "waiting") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] p-4 islamic-pattern">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] ramadan-gradient relative overflow-hidden">
+        <div className="mosque-silhouette opacity-15" />
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {[...Array(10)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute"
+              style={{ left: `${5 + i * 10}%`, top: `${10 + (i % 4) * 20}%` }}
+              animate={{ opacity: [0.1, 0.5, 0.1], scale: [0.8, 1.2, 0.8] }}
+              transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.5 }}
+            >
+              <Star className="h-2 w-2 text-amber-300 fill-amber-300" />
+            </motion.div>
+          ))}
+        </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
+          className="text-center space-y-5 relative z-10 p-6"
         >
-          <Moon className="h-16 w-16 text-amber-500 mx-auto animate-float" />
+          <motion.div
+            animate={{ y: [0, -12, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Moon className="h-20 w-20 text-amber-400 fill-amber-400 mx-auto drop-shadow-lg" />
+          </motion.div>
           <h2
-            className={`text-2xl font-bold ${isRTL ? "font-arabic" : ""}`}
+            className={`text-3xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}
             data-testid="text-waiting"
           >
             {t("waiting")}
           </h2>
-          <p className={`text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+          <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
             {t("gameWelcomeDesc")}
           </p>
-          <Button variant="outline" onClick={() => setLocation("/")} data-testid="button-back-home">
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/")}
+            className="bg-white/10 border-white/20 text-white"
+            data-testid="button-back-home"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className={isRTL ? "font-arabic" : ""}>{t("backToHome")}</span>
           </Button>
@@ -253,51 +278,59 @@ export default function Game() {
   }
 
   return (
-    <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-56px)]">
+    <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
       {currentTeam && (
         <motion.div
           key={currentTeam.id}
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="p-3 md:p-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-4 h-4 rounded-full animate-pulse"
-                  style={{ backgroundColor: currentTeam.color }}
-                />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{t("currentTeam")}</span>
-                  </div>
-                  <h2
-                    className={`text-base md:text-lg font-bold ${isRTL ? "font-arabic" : ""}`}
-                    data-testid="text-current-team"
+          <Card className="p-0 overflow-visible">
+            <div className="p-3 md:p-4">
+              <div
+                className="absolute top-0 left-0 right-0 h-1 rounded-t-md"
+                style={{ backgroundColor: currentTeam.color }}
+              />
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                    style={{ backgroundColor: currentTeam.color }}
                   >
-                    {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
-                  </h2>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <Badge
-                  variant="outline"
-                  className="text-xs"
-                  style={{ borderColor: currentTeam.color, color: currentTeam.color }}
-                >
-                  <Crown className="h-3 w-3 me-1 text-amber-500" />
-                  {t("captain")}: {currentTeam.captain}
-                </Badge>
-                {currentTeam.members && currentTeam.members.length > 0 && (
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {currentTeam.members.map((member, idx) => (
-                      <span key={idx} className="text-xs text-muted-foreground font-arabic">
-                        {member}{idx < currentTeam.members.length - 1 ? " ·" : ""}
-                      </span>
-                    ))}
+                    <Users className="h-5 w-5" />
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-3 w-3 text-amber-500" />
+                      <span className="text-xs text-muted-foreground">{t("currentTeam")}</span>
+                    </div>
+                    <h2
+                      className={`text-base md:text-lg font-bold ${isRTL ? "font-arabic" : ""}`}
+                      data-testid="text-current-team"
+                    >
+                      {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
+                    </h2>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge
+                    variant="outline"
+                    className="text-xs gap-1"
+                    style={{ borderColor: currentTeam.color, color: currentTeam.color }}
+                  >
+                    <Crown className="h-3 w-3 text-amber-500" />
+                    {currentTeam.captain}
+                  </Badge>
+                  {currentTeam.members && currentTeam.members.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {currentTeam.members.map((member, idx) => (
+                        <span key={idx} className="text-xs text-muted-foreground font-arabic">
+                          {member}{idx < currentTeam.members.length - 1 ? " ·" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
@@ -315,7 +348,7 @@ export default function Game() {
                 exit={{ opacity: 0 }}
                 className="space-y-4"
               >
-                <Card className="p-4">
+                <Card className="p-3 md:p-4">
                   <Timer
                     key={timerKey}
                     duration={session.timerSeconds || 30}

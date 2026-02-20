@@ -39,6 +39,11 @@ import {
   Loader2,
   Upload,
   Crown,
+  Star,
+  Sparkles,
+  Activity,
+  HelpCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { Team, GameSession, TeamScore, AuthorizedEmail } from "@shared/schema";
 
@@ -83,6 +88,11 @@ export default function Admin() {
 
   const { data: teamsData, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ["/api/teams"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: questionsData } = useQuery<any[]>({
+    queryKey: ["/api/questions"],
     enabled: isAuthenticated,
   });
 
@@ -213,7 +223,6 @@ export default function Admin() {
             });
             results.push(await res.json());
           } catch (e) {
-            // skip duplicates
           }
         }
       }
@@ -229,17 +238,31 @@ export default function Admin() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-[calc(100vh-56px)] flex items-center justify-center p-4 islamic-pattern">
+      <div className="min-h-[calc(100vh-52px)] flex items-center justify-center ramadan-gradient relative overflow-hidden">
+        <div className="mosque-silhouette opacity-15" />
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute"
+              style={{ left: `${15 + i * 14}%`, top: `${20 + (i % 3) * 25}%` }}
+              animate={{ opacity: [0.1, 0.4, 0.1] }}
+              transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.5 }}
+            >
+              <Star className="h-2 w-2 text-amber-300 fill-amber-300" />
+            </motion.div>
+          ))}
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
+          className="w-full max-w-sm relative z-10 p-4"
         >
-          <Card className="p-6 space-y-5">
+          <Card className="p-6 space-y-5 bg-background/95 backdrop-blur-sm">
             <div className="text-center space-y-2">
               <div className="flex justify-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Shield className="h-6 w-6 text-primary" />
+                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Shield className="h-7 w-7 text-primary" />
                 </div>
               </div>
               <h2 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>{t("adminLogin")}</h2>
@@ -259,7 +282,7 @@ export default function Admin() {
                 />
               </div>
               <Button
-                className="w-full"
+                className="w-full gold-gradient border-amber-400/30 text-white font-bold"
                 onClick={() => loginMutation.mutate()}
                 disabled={loginMutation.isPending || !password}
                 data-testid="button-admin-login"
@@ -287,27 +310,31 @@ export default function Admin() {
   const scores = sessionData?.scores || [];
   const teams = teamsData || [];
   const authorizedEmails = authorizedEmailsData || [];
+  const totalQuestions = questionsData?.length || 36;
+  const answeredCount = sessionData?.answeredQuestionIds?.length || 0;
 
   const isLoading = sessionLoading || teamsLoading;
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-48 w-full" />
+      <div className="p-4 md:p-6 space-y-4 islamic-pattern">
+        <Skeleton className="h-12 w-full rounded-md" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
+        </div>
+        <Skeleton className="h-64 w-full rounded-md" />
       </div>
     );
   }
 
   const statusColor =
     session?.status === "active"
-      ? "text-emerald-500"
+      ? "bg-emerald-500"
       : session?.status === "paused"
-        ? "text-amber-500"
+        ? "bg-amber-500"
         : session?.status === "finished"
-          ? "text-red-500"
-          : "text-muted-foreground";
+          ? "bg-red-500"
+          : "bg-muted-foreground";
 
   const statusText =
     session?.status === "active"
@@ -325,7 +352,7 @@ export default function Admin() {
   };
 
   return (
-    <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-56px)]">
+    <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => setLocation("/")} data-testid="button-back-admin">
@@ -336,9 +363,10 @@ export default function Admin() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={statusColor} data-testid="text-game-status">
-            {statusText}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            <div className={`w-2 h-2 rounded-full ${statusColor} ${session?.status === "active" ? "animate-pulse" : ""}`} />
+            <span className="text-sm font-medium" data-testid="text-game-status">{statusText}</span>
+          </div>
           <Button variant="outline" size="sm" onClick={() => setLocation("/game")} data-testid="button-view-game-admin">
             <Eye className="h-4 w-4" />
             <span className={isRTL ? "font-arabic" : ""}>{t("viewGame")}</span>
@@ -346,11 +374,46 @@ export default function Admin() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="h-4 w-4 text-blue-500" />
+            <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("teams")}</span>
+          </div>
+          <p className="text-2xl font-bold">{teams.length}</p>
+        </Card>
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <HelpCircle className="h-4 w-4 text-amber-500" />
+            <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("questions")}</span>
+          </div>
+          <p className="text-2xl font-bold">{answeredCount}/{totalQuestions}</p>
+        </Card>
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Mail className="h-4 w-4 text-emerald-500" />
+            <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("manageEmails")}</span>
+          </div>
+          <p className="text-2xl font-bold">{authorizedEmails.length}</p>
+        </Card>
+        <Card className="p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Activity className="h-4 w-4 text-purple-500" />
+            <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("gameStatus")}</span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
+            <div className={`w-2.5 h-2.5 rounded-full ${statusColor} ${session?.status === "active" ? "animate-pulse" : ""}`} />
+            <span className="text-sm font-semibold">{statusText}</span>
+          </div>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="p-4 space-y-4">
           <h3
-            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
           >
+            <Sparkles className="h-4 w-4 text-amber-500" />
             {t("gameControls")}
           </h3>
 
@@ -359,7 +422,7 @@ export default function Admin() {
               <Button
                 onClick={() => gameActionMutation.mutate("start")}
                 disabled={gameActionMutation.isPending}
-                className="col-span-2"
+                className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold"
                 data-testid="button-start-game"
               >
                 <Play className="h-4 w-4" />
@@ -427,80 +490,102 @@ export default function Admin() {
         </Card>
 
         <Card className="p-4">
-          <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} />
+          <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} compact />
         </Card>
 
         <Card className="p-4 space-y-3 lg:col-span-2">
           <h3
-            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
           >
+            <Plus className="h-4 w-4 text-emerald-500" />
             {t("adjustScore")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {teams.map((team) => (
-              <div
-                key={team.id}
-                className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
-              >
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
-                <span className={`text-sm font-medium flex-1 truncate ${isRTL ? "font-arabic" : ""}`}>
-                  {language === "ar" ? team.nameAr : team.nameEn}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() =>
-                      scoreAdjustMutation.mutate({ teamId: team.id, points: -10 })
-                    }
-                    data-testid={`button-remove-points-${team.id}`}
+            {teams.map((team) => {
+              const teamScore = scores.find(s => s.teamId === team.id);
+              return (
+                <div
+                  key={team.id}
+                  className="flex items-center gap-2 p-3 rounded-md bg-muted/30"
+                  style={{ borderLeftColor: team.color, borderLeftWidth: 0 }}
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ backgroundColor: team.color }}
                   >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() =>
-                      scoreAdjustMutation.mutate({ teamId: team.id, points: 10 })
-                    }
-                    data-testid={`button-add-points-${team.id}`}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
+                    {teamScore?.score || 0}
+                  </div>
+                  <span className={`text-sm font-medium flex-1 truncate ${isRTL ? "font-arabic" : ""}`}>
+                    {language === "ar" ? team.nameAr : team.nameEn}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() =>
+                        scoreAdjustMutation.mutate({ teamId: team.id, points: -10 })
+                      }
+                      data-testid={`button-remove-points-${team.id}`}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() =>
+                        scoreAdjustMutation.mutate({ teamId: team.id, points: 10 })
+                      }
+                      data-testid={`button-add-points-${team.id}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
 
         <Card className="p-4 space-y-4 lg:col-span-2">
           <h3
-            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
           >
-            <Users className="h-4 w-4 inline-block me-2" />
+            <Users className="h-4 w-4 text-blue-500" />
             {t("teamRoster")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {teams.map((team) => (
-              <div key={team.id} className="p-3 rounded-md bg-muted/30 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
-                  <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
-                    {language === "ar" ? team.nameAr : team.nameEn}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Crown className="h-3 w-3 text-amber-500" />
-                    <span className="font-arabic font-medium">{team.captain}</span>
-                  </div>
-                  {team.members && team.members.map((member, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground ps-4">
-                      <span className="font-arabic">{member}</span>
+              <Card key={team.id} className="p-0 overflow-visible relative">
+                <div
+                  className="absolute top-0 left-0 right-0 h-1 rounded-t-md"
+                  style={{ backgroundColor: team.color }}
+                />
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0"
+                      style={{ backgroundColor: team.color }}
+                    >
+                      <Users className="h-3 w-3" />
                     </div>
-                  ))}
+                    <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
+                      {language === "ar" ? team.nameAr : team.nameEn}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs p-1.5 rounded bg-amber-500/10">
+                      <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                      <span className="font-arabic font-medium">{team.captain}</span>
+                    </div>
+                    {team.members && team.members.map((member, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground ps-4">
+                        <div className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
+                        <span className="font-arabic">{member}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </Card>
@@ -508,10 +593,11 @@ export default function Admin() {
         <Card className="p-4 space-y-4 lg:col-span-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3
-              className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider ${isRTL ? "font-arabic" : ""}`}
+              className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
             >
-              <Mail className="h-4 w-4 inline-block me-2" />
+              <Mail className="h-4 w-4 text-emerald-500" />
               {t("manageEmails")}
+              <Badge variant="secondary" className="text-[10px]">{authorizedEmails.length}</Badge>
             </h3>
             <Button
               variant="outline"
@@ -525,7 +611,11 @@ export default function Admin() {
           </div>
 
           {showBulk && (
-            <div className="space-y-2 p-3 rounded-md bg-muted/30">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="space-y-2 p-3 rounded-md bg-muted/30"
+            >
               <Textarea
                 placeholder={t("bulkImportPlaceholder")}
                 value={bulkText}
@@ -544,7 +634,7 @@ export default function Admin() {
                 {bulkImportMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                 <span className={isRTL ? "font-arabic" : ""}>{t("importEmails")}</span>
               </Button>
-            </div>
+            </motion.div>
           )}
 
           <div className="flex flex-col gap-2">
@@ -600,53 +690,61 @@ export default function Admin() {
           </div>
 
           {authorizedEmails.length === 0 ? (
-            <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>
+            <p className={`text-sm text-muted-foreground text-center py-6 ${isRTL ? "font-arabic" : ""}`}>
               {t("noAuthorizedEmails")}
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {authorizedEmails.map((entry) => (
-                <div
+                <motion.div
                   key={entry.id}
-                  className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
-                  data-testid={`email-entry-${entry.id}`}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 p-2.5 rounded-md bg-muted/30"
+                  data-testid={`row-email-${entry.id}`}
                 >
-                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Mail className="h-3.5 w-3.5 text-primary" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium truncate">{entry.name}</p>
+                      <span className="text-sm font-medium truncate" dir="ltr">{entry.email}</span>
                       {entry.playerName && (
                         <span className="text-xs text-muted-foreground font-arabic">({entry.playerName})</span>
                       )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">{entry.name}</span>
                       {entry.teamId && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-[10px]">
                           {getTeamName(entry.teamId)}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate" dir="ltr">{entry.email}</p>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       size="icon"
-                      variant="outline"
-                      onClick={() => sendInvitationMutation.mutate({ email: entry.email, name: entry.name })}
+                      variant="ghost"
+                      onClick={() =>
+                        sendInvitationMutation.mutate({ email: entry.email, name: entry.name })
+                      }
                       disabled={sendInvitationMutation.isPending}
                       data-testid={`button-send-invitation-${entry.id}`}
                     >
-                      {sendInvitationMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                      <Send className="h-3 w-3" />
                     </Button>
                     <Button
                       size="icon"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => removeEmailMutation.mutate(entry.id)}
                       disabled={removeEmailMutation.isPending}
                       data-testid={`button-remove-email-${entry.id}`}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}

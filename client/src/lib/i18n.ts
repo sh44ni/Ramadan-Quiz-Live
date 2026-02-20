@@ -128,6 +128,9 @@ const resources = {
       importEmails: "Import",
       imported: "Imported",
       importedDesc: "Players imported successfully",
+      plentyOfTime: "Plenty of time",
+      hurryUp: "Hurry up!",
+      almostOut: "Almost out!",
     },
   },
   ar: {
@@ -256,6 +259,9 @@ const resources = {
       importEmails: "استيراد",
       imported: "تم الاستيراد",
       importedDesc: "تم استيراد اللاعبين بنجاح",
+      plentyOfTime: "وقت كافٍ",
+      hurryUp: "أسرع!",
+      almostOut: "الوقت ينفد!",
     },
   },
 };

@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { CheckCircle2, XCircle, HelpCircle, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { Card } from "@/components/ui/card";
@@ -16,8 +15,6 @@ interface QuestionDisplayProps {
   disabled: boolean;
   selectedAnswer: string | null;
 }
-
-const optionLabels = ["a", "b", "c", "d"] as const;
 
 export function QuestionDisplay({
   question,
@@ -43,18 +40,18 @@ export function QuestionDisplay({
   const getOptionStyle = (key: string) => {
     if (!showResult) {
       if (selectedAnswer === key) {
-        return "bg-primary text-primary-foreground border-primary";
+        return "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20";
       }
       return "bg-card border-border hover-elevate active-elevate-2 cursor-pointer";
     }
 
     if (key === correctAnswer) {
-      return "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300";
+      return "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-md shadow-emerald-500/10";
     }
     if (key === selectedAnswer && showResult === "incorrect") {
       return "bg-red-500/15 border-red-500 text-red-700 dark:text-red-300";
     }
-    return "bg-muted/50 border-border text-muted-foreground";
+    return "bg-muted/50 border-border text-muted-foreground opacity-50";
   };
 
   return (
@@ -65,7 +62,8 @@ export function QuestionDisplay({
       className="space-y-4"
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <Badge variant="outline" className="shrink-0">
+        <Badge variant="outline" className="shrink-0 gap-1">
+          <Sparkles className="h-3 w-3 text-amber-500" />
           {t("questionNumber")}{questionNumber}
         </Badge>
         <Badge variant="secondary" className="shrink-0">
@@ -73,9 +71,11 @@ export function QuestionDisplay({
         </Badge>
       </div>
 
-      <Card className="p-4 md:p-6">
+      <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/5 to-transparent">
         <div className="flex items-start gap-3">
-          <HelpCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 shrink-0 mt-0.5">
+            <HelpCircle className="h-4 w-4 text-primary" />
+          </div>
           <h2
             className={`text-base md:text-lg font-semibold leading-relaxed ${isRTL ? "font-arabic text-right" : ""}`}
             data-testid="text-question"
@@ -92,6 +92,7 @@ export function QuestionDisplay({
             initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.08 }}
+            whileTap={!disabled && !showResult ? { scale: 0.98 } : {}}
             onClick={() => !disabled && !showResult && onAnswer(option.key)}
             disabled={disabled || !!showResult}
             className={`
@@ -103,7 +104,7 @@ export function QuestionDisplay({
           >
             <span
               className={`
-                flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0
+                flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold shrink-0 transition-all
                 ${
                   selectedAnswer === option.key && !showResult
                     ? "bg-white/20 text-white"
@@ -121,10 +122,22 @@ export function QuestionDisplay({
               {option.text}
             </span>
             {showResult && option.key === correctAnswer && (
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500 }}
+              >
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+              </motion.div>
             )}
             {showResult && option.key === selectedAnswer && showResult === "incorrect" && (
-              <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500 }}
+              >
+                <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+              </motion.div>
             )}
           </motion.button>
         ))}
@@ -133,27 +146,40 @@ export function QuestionDisplay({
       <AnimatePresence>
         {showResult && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -10 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
             className={`
-              flex items-center justify-center gap-2 p-4 rounded-md text-center font-bold text-lg
+              flex items-center justify-center gap-3 p-5 rounded-md text-center font-bold text-lg
               ${
                 showResult === "correct"
-                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                  : "bg-red-500/15 text-red-600 dark:text-red-400"
+                  ? "correct-flash text-emerald-600 dark:text-emerald-400"
+                  : "incorrect-flash bg-red-500/15 text-red-600 dark:text-red-400"
               }
             `}
             data-testid="text-result"
           >
             {showResult === "correct" ? (
               <>
-                <CheckCircle2 className="h-6 w-6" />
+                <motion.div
+                  animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <CheckCircle2 className="h-8 w-8" />
+                </motion.div>
                 <span className={isRTL ? "font-arabic" : ""}>{t("correct")}</span>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-2xl"
+                >
+                  +10
+                </motion.div>
               </>
             ) : (
               <>
-                <XCircle className="h-6 w-6" />
+                <XCircle className="h-8 w-8" />
                 <span className={isRTL ? "font-arabic" : ""}>{t("incorrect")}</span>
               </>
             )}
