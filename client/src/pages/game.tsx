@@ -68,6 +68,12 @@ export default function Game() {
     }
   }, [currentQuestion]);
 
+  useEffect(() => {
+    if (session?.status === "finished") {
+      setLocation("/results");
+    }
+  }, [session?.status, setLocation]);
+
   const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
 
   const handleSelectQuestion = useCallback(
@@ -179,12 +185,6 @@ export default function Game() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (session?.status === "finished") {
-      setLocation("/results");
-    }
-  }, [session?.status, setLocation]);
 
   if (session?.status === "finished") {
     return null;
