@@ -99,7 +99,7 @@ export async function registerRoutes(
 
       try {
         await resend.emails.send({
-          from: "Ramadan Quiz <onboarding@resend.dev>",
+          from: "Ramadan Quiz <noreplyplayers@jabal.webdistt.com>",
           to: normalizedEmail,
           subject: "Your Ramadan Quiz Access Code | رمز الدخول لمسابقة رمضان",
           html: `
@@ -208,7 +208,7 @@ export async function registerRoutes(
 
       try {
         await resend.emails.send({
-          from: "Ramadan Quiz <onboarding@resend.dev>",
+          from: "Ramadan Quiz <noreplyplayers@jabal.webdistt.com>",
           to: email,
           subject: "You're Invited to Ramadan Quiz! | دعوة لمسابقة رمضان",
           html: `
