@@ -42,4 +42,3 @@ waitForPort = 5000
 [userenv]
 
 [userenv.shared]
-ADMIN_PASSWORD = "jabaladmin431#"

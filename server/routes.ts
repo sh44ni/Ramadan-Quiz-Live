@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "jabaladmin431#";
+const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
 const adminTokens = new Set<string>();
 const playerTokens = new Map<string, string>();
 
