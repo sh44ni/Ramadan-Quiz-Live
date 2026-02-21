@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Scoreboard } from "@/components/scoreboard";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useGameSocket } from "@/lib/useGameSocket";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,9 @@ import {
   Activity,
   HelpCircle,
   CheckCircle2,
+  Monitor,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import type { Team, GameSession, TeamScore, AuthorizedEmail } from "@shared/schema";
 
@@ -62,6 +66,19 @@ export default function Admin() {
   const [newTeamId, setNewTeamId] = useState<string>("");
   const [bulkText, setBulkText] = useState("");
   const [showBulk, setShowBulk] = useState(false);
+
+  const {
+    gameState: wsGameState,
+    connected: wsConnected,
+    adminStart,
+    adminPause,
+    adminResume,
+    adminEnd,
+    adminReset,
+    adminSkip,
+    adminSetTeam,
+    adminAdjustScore,
+  } = useGameSocket();
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -371,6 +388,19 @@ export default function Admin() {
             <Eye className="h-4 w-4" />
             <span className={isRTL ? "font-arabic" : ""}>{t("viewGame")}</span>
           </Button>
+          <Button variant="outline" size="sm" onClick={() => window.open("/display", "_blank")} data-testid="button-open-display">
+            <Monitor className="h-4 w-4" />
+            <span className={isRTL ? "font-arabic" : ""}>{t("displayScreen") || "Display"}</span>
+          </Button>
+          {wsConnected ? (
+            <Badge variant="secondary" className="gap-1 text-emerald-500 text-xs">
+              <Wifi className="h-3 w-3" /> Live
+            </Badge>
+          ) : (
+            <Badge variant="destructive" className="gap-1 text-xs">
+              <WifiOff className="h-3 w-3" /> Offline
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -420,8 +450,7 @@ export default function Admin() {
           <div className="grid grid-cols-2 gap-2">
             {(!session || session.status === "waiting" || session.status === "finished") && (
               <Button
-                onClick={() => gameActionMutation.mutate("start")}
-                disabled={gameActionMutation.isPending}
+                onClick={() => { adminStart(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                 className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold"
                 data-testid="button-start-game"
               >
@@ -433,8 +462,7 @@ export default function Admin() {
             {session?.status === "active" && (
               <Button
                 variant="secondary"
-                onClick={() => gameActionMutation.mutate("pause")}
-                disabled={gameActionMutation.isPending}
+                onClick={() => { adminPause(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                 data-testid="button-pause"
               >
                 <Pause className="h-4 w-4" />
@@ -444,8 +472,7 @@ export default function Admin() {
 
             {session?.status === "paused" && (
               <Button
-                onClick={() => gameActionMutation.mutate("resume")}
-                disabled={gameActionMutation.isPending}
+                onClick={() => { adminResume(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                 data-testid="button-resume"
               >
                 <Play className="h-4 w-4" />
@@ -457,8 +484,7 @@ export default function Admin() {
               <>
                 <Button
                   variant="secondary"
-                  onClick={() => skipMutation.mutate()}
-                  disabled={skipMutation.isPending}
+                  onClick={() => { adminSkip(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                   data-testid="button-skip"
                 >
                   <SkipForward className="h-4 w-4" />
@@ -466,8 +492,7 @@ export default function Admin() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => gameActionMutation.mutate("end")}
-                  disabled={gameActionMutation.isPending}
+                  onClick={() => { adminEnd(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                   data-testid="button-end"
                 >
                   <Square className="h-4 w-4" />
@@ -478,8 +503,7 @@ export default function Admin() {
 
             <Button
               variant="outline"
-              onClick={() => gameActionMutation.mutate("reset")}
-              disabled={gameActionMutation.isPending}
+              onClick={() => { adminReset(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
               className={session && session.status !== "waiting" ? "" : "col-span-2"}
               data-testid="button-reset"
             >
@@ -487,6 +511,29 @@ export default function Admin() {
               <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
             </Button>
           </div>
+
+          {session && session.status === "active" && teams.length > 0 && (
+            <div className="space-y-2 pt-2 border-t">
+              <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                {t("setCurrentTeam") || "Set Current Team"}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {teams.map((team) => (
+                  <Button
+                    key={team.id}
+                    size="sm"
+                    variant={session.currentTeamId === team.id ? "default" : "outline"}
+                    onClick={() => { adminSetTeam(team.id); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                    className="text-xs"
+                    data-testid={`button-set-team-${team.id}`}
+                  >
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
+                    <span className={isRTL ? "font-arabic" : ""}>{language === "ar" ? team.nameAr : team.nameEn}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="p-4">
@@ -522,9 +569,10 @@ export default function Admin() {
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={() =>
-                        scoreAdjustMutation.mutate({ teamId: team.id, points: -10 })
-                      }
+                      onClick={() => {
+                        adminAdjustScore(team.id, -10);
+                        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500);
+                      }}
                       data-testid={`button-remove-points-${team.id}`}
                     >
                       <Minus className="h-3 w-3" />
@@ -532,9 +580,10 @@ export default function Admin() {
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={() =>
-                        scoreAdjustMutation.mutate({ teamId: team.id, points: 10 })
-                      }
+                      onClick={() => {
+                        adminAdjustScore(team.id, 10);
+                        setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500);
+                      }}
                       data-testid={`button-add-points-${team.id}`}
                     >
                       <Plus className="h-3 w-3" />

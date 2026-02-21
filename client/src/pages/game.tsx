@@ -1,20 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
+import { useGameSocket } from "@/lib/useGameSocket";
 import { motion, AnimatePresence } from "framer-motion";
 import { QuestionGrid } from "@/components/question-grid";
-import { Timer } from "@/components/timer";
-import { Scoreboard } from "@/components/scoreboard";
 import { QuestionDisplay } from "@/components/question-display";
+import { Scoreboard } from "@/components/scoreboard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Moon, ArrowLeft, Lock, Crown, Star, Sparkles } from "lucide-react";
+import { Users, Moon, ArrowLeft, Lock, Crown, Star, Sparkles, Wifi, WifiOff } from "lucide-react";
 import { useLocation } from "wouter";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
 
 export default function Game() {
   const { t } = useTranslation();
@@ -23,11 +20,14 @@ export default function Game() {
 
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showResult, setShowResult] = useState<"correct" | "incorrect" | null>(null);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerKey, setTimerKey] = useState(0);
-  const lastQuestionIdRef = useRef<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [playerTeamId, setPlayerTeamId] = useState<number | null>(null);
+  const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
+
+  const { gameState, timer, answerResult, connected, selectQuestion, submitAnswer } = useGameSocket();
+  const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
+  const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,6 +43,7 @@ export default function Game() {
         });
         const data = await res.json();
         setIsAuthorized(data.valid);
+        if (data.teamId) setPlayerTeamId(data.teamId);
       } catch {
         setIsAuthorized(false);
       }
@@ -51,49 +52,27 @@ export default function Game() {
     checkAuth();
   }, []);
 
-  const { data: teamsData, isLoading: teamsLoading } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
-    enabled: isAuthorized,
-  });
-
-  const { data: questionsData, isLoading: questionsLoading } = useQuery<Question[]>({
-    queryKey: ["/api/questions"],
-    enabled: isAuthorized,
-  });
-
-  const { data: sessionData, isLoading: sessionLoading } = useQuery<{
-    session: GameSession;
-    scores: TeamScore[];
-    answeredQuestionIds: number[];
-  } | null>({
-    queryKey: ["/api/game/current"],
-    refetchInterval: 1500,
-    enabled: isAuthorized,
-  });
-
-  const session = sessionData?.session || null;
-  const scores = sessionData?.scores || [];
-  const answeredQuestionIds = sessionData?.answeredQuestionIds || [];
-  const teams = teamsData || [];
-  const questions = questionsData || [];
-
-  const currentQuestion = session?.currentQuestionId
-    ? questions.find((q) => q.id === session.currentQuestionId) || null
-    : null;
-
   useEffect(() => {
-    if (currentQuestion && currentQuestion.id !== lastQuestionIdRef.current) {
-      lastQuestionIdRef.current = currentQuestion.id;
+    if (currentQuestion && currentQuestion.id !== lastQuestionId) {
+      setLastQuestionId(currentQuestion.id);
       setSelectedAnswer(null);
       setShowResult(null);
-      setTimerRunning(true);
-      setTimerKey((k) => k + 1);
     }
     if (!currentQuestion) {
-      lastQuestionIdRef.current = null;
-      setTimerRunning(false);
+      setLastQuestionId(null);
     }
-  }, [currentQuestion]);
+  }, [currentQuestion, lastQuestionId]);
+
+  useEffect(() => {
+    if (answerResult) {
+      setShowResult(answerResult.isCorrect ? "correct" : "incorrect");
+      const timeout = setTimeout(() => {
+        setShowResult(null);
+        setSelectedAnswer(null);
+      }, 2500);
+      return () => clearTimeout(timeout);
+    }
+  }, [answerResult]);
 
   useEffect(() => {
     if (session?.status === "finished") {
@@ -101,69 +80,29 @@ export default function Game() {
     }
   }, [session?.status, setLocation]);
 
-  const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
-
   const handleSelectQuestion = useCallback(
-    async (questionId: number) => {
+    (questionId: number) => {
       if (!session) return;
-      try {
-        await apiRequest("POST", "/api/game/select-question", {
-          sessionId: session.id,
-          questionId,
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
-      } catch (error) {
-        console.error("Error selecting question:", error);
-      }
+      selectQuestion(questionId, session.id);
     },
-    [session],
+    [session, selectQuestion],
   );
 
   const handleAnswer = useCallback(
-    async (answer: string) => {
+    (answer: string) => {
       if (!currentQuestion || !session) return;
       setSelectedAnswer(answer);
-      setTimerRunning(false);
-      try {
-        const res = await apiRequest("POST", "/api/game/answer", {
-          sessionId: session.id,
-          questionId: currentQuestion.id,
-          teamId: session.currentTeamId,
-          answer,
-        });
-        const result = await res.json();
-        setShowResult(result.isCorrect ? "correct" : "incorrect");
-        setTimeout(() => {
-          setShowResult(null);
-          setSelectedAnswer(null);
-          queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
-        }, 2500);
-      } catch (error) {
-        console.error("Error submitting answer:", error);
-      }
+      submitAnswer(answer, session.id, session.currentTeamId!, currentQuestion.id);
     },
-    [currentQuestion, session],
+    [currentQuestion, session, submitAnswer],
   );
 
   const handleTimeUp = useCallback(() => {
     if (!currentQuestion || !session) return;
-    setTimerRunning(false);
-    apiRequest("POST", "/api/game/answer", {
-      sessionId: session.id,
-      questionId: currentQuestion.id,
-      teamId: session.currentTeamId,
-      answer: null,
-    }).then(() => {
-      setShowResult("incorrect");
-      setTimeout(() => {
-        setShowResult(null);
-        setSelectedAnswer(null);
-        queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
-      }, 2500);
-    });
-  }, [currentQuestion, session]);
+    submitAnswer("", session.id, session.currentTeamId!, currentQuestion.id);
+  }, [currentQuestion, session, submitAnswer]);
 
-  const isLoading = teamsLoading || questionsLoading || sessionLoading;
+  const isMyTurn = playerTeamId ? session?.currentTeamId === playerTeamId : true;
 
   if (!authChecked) {
     return (
@@ -186,10 +125,7 @@ export default function Game() {
           <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mx-auto">
             <Lock className="h-10 w-10 text-amber-400" />
           </div>
-          <h2
-            className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}
-            data-testid="text-auth-required"
-          >
+          <h2 className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-auth-required">
             {t("authRequired")}
           </h2>
           <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
@@ -203,21 +139,6 @@ export default function Game() {
             <span className={isRTL ? "font-arabic" : ""}>{t("playerLogin")}</span>
           </Button>
         </motion.div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-6 space-y-4 islamic-pattern">
-        <Skeleton className="h-16 w-full rounded-md" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <Skeleton className="h-48 w-full rounded-md" />
-            <Skeleton className="h-64 w-full rounded-md" />
-          </div>
-          <Skeleton className="h-96 w-full rounded-md" />
-        </div>
       </div>
     );
   }
@@ -250,15 +171,23 @@ export default function Game() {
           >
             <Moon className="h-20 w-20 text-amber-400 fill-amber-400 mx-auto drop-shadow-lg" />
           </motion.div>
-          <h2
-            className={`text-3xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}
-            data-testid="text-waiting"
-          >
+          <h2 className={`text-3xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-waiting">
             {t("waiting")}
           </h2>
           <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
             {t("gameWelcomeDesc")}
           </p>
+          <div className="flex items-center justify-center gap-2">
+            {connected ? (
+              <Badge variant="secondary" className="gap-1 text-emerald-500">
+                <Wifi className="h-3 w-3" /> {t("connected") || "Connected"}
+              </Badge>
+            ) : (
+              <Badge variant="destructive" className="gap-1">
+                <WifiOff className="h-3 w-3" /> {t("reconnecting") || "Reconnecting..."}
+              </Badge>
+            )}
+          </div>
           <Button
             variant="outline"
             onClick={() => setLocation("/")}
@@ -279,6 +208,23 @@ export default function Game() {
 
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-between gap-2">
+        {connected ? (
+          <Badge variant="secondary" className="gap-1 text-emerald-500 text-xs">
+            <Wifi className="h-3 w-3" /> {t("live") || "Live"}
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="gap-1 text-xs">
+            <WifiOff className="h-3 w-3" /> {t("reconnecting") || "Reconnecting..."}
+          </Badge>
+        )}
+        {session.status === "paused" && (
+          <Badge variant="secondary" className="text-amber-500 gap-1">
+            {t("paused")}
+          </Badge>
+        )}
+      </div>
+
       {currentTeam && (
         <motion.div
           key={currentTeam.id}
@@ -321,14 +267,10 @@ export default function Game() {
                     <Crown className="h-3 w-3 text-amber-500" />
                     {currentTeam.captain}
                   </Badge>
-                  {currentTeam.members && currentTeam.members.length > 0 && (
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {currentTeam.members.map((member, idx) => (
-                        <span key={idx} className="text-xs text-muted-foreground font-arabic">
-                          {member}{idx < currentTeam.members.length - 1 ? " ·" : ""}
-                        </span>
-                      ))}
-                    </div>
+                  {!isMyTurn && (
+                    <Badge variant="secondary" className="text-xs text-amber-600">
+                      {t("waitingForTurn") || "Waiting for your turn..."}
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -349,23 +291,61 @@ export default function Game() {
                 className="space-y-4"
               >
                 <Card className="p-3 md:p-4">
-                  <Timer
-                    key={timerKey}
-                    duration={session.timerSeconds || 30}
-                    isRunning={timerRunning}
-                    onTimeUp={handleTimeUp}
-                  />
+                  <div className="flex items-center gap-4 p-2 rounded-md">
+                    <div className="relative w-20 h-20 shrink-0">
+                      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="38" stroke="hsl(var(--muted))" strokeWidth="4" fill="none" />
+                        <motion.circle
+                          cx="40" cy="40" r="38"
+                          stroke={timer.seconds > 20 ? "#10b981" : timer.seconds > 10 ? "#f59e0b" : "#ef4444"}
+                          strokeWidth="4"
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 38}
+                          animate={{ strokeDashoffset: (2 * Math.PI * 38) - ((timer.seconds / 30) * (2 * Math.PI * 38)) }}
+                          transition={{ duration: 0.5, ease: "linear" }}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span
+                          className={`text-2xl font-bold tabular-nums ${
+                            timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                          } ${timer.seconds <= 5 ? "animate-pulse" : ""}`}
+                          data-testid="text-timer"
+                        >
+                          {timer.seconds}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">{t("timer")}</span>
+                        <span className={`text-xs font-medium ${
+                          timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                        }`}>
+                          {timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut")}
+                        </span>
+                      </div>
+                      <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
+                        <motion.div
+                          className={`h-full rounded-full transition-colors duration-500 ${
+                            timer.seconds > 20 ? "bg-emerald-500" : timer.seconds > 10 ? "bg-amber-500" : "bg-red-500"
+                          }`}
+                          animate={{ width: `${(timer.seconds / 30) * 100}%` }}
+                          transition={{ duration: 0.3, ease: "linear" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </Card>
                 <QuestionDisplay
                   question={currentQuestion}
-                  questionNumber={
-                    questions.findIndex((q) => q.id === currentQuestion.id) + 1
-                  }
+                  questionNumber={questions.findIndex((q) => q.id === currentQuestion.id) + 1}
                   onAnswer={handleAnswer}
                   showResult={showResult}
-                  correctAnswer={showResult ? currentQuestion.correctAnswer : null}
-                  disabled={!!selectedAnswer}
-                  selectedAnswer={selectedAnswer}
+                  correctAnswer={showResult ? (answerResult?.correctAnswer || currentQuestion.correctAnswer) : null}
+                  disabled={!!selectedAnswer || !isMyTurn}
+                  selectedAnswer={selectedAnswer || (answerResult?.answerGiven || null)}
                 />
               </motion.div>
             ) : (
@@ -376,7 +356,7 @@ export default function Game() {
                     answeredQuestions={answeredQuestionIds}
                     currentQuestion={null}
                     onSelectQuestion={handleSelectQuestion}
-                    disabled={session.status !== "active"}
+                    disabled={session.status !== "active" || !isMyTurn}
                   />
                 </Card>
               </motion.div>
