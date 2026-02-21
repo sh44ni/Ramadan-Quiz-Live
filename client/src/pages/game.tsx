@@ -75,10 +75,10 @@ export default function Game() {
   }, [answerResult]);
 
   useEffect(() => {
-    if (session?.status === "finished") {
+    if (isAuthorized && session?.status === "finished") {
       setLocation("/results");
     }
-  }, [session?.status, setLocation]);
+  }, [isAuthorized, session?.status, setLocation]);
 
   const handleSelectQuestion = useCallback(
     (questionId: number) => {
@@ -96,11 +96,6 @@ export default function Game() {
     },
     [currentQuestion, session, submitAnswer],
   );
-
-  const handleTimeUp = useCallback(() => {
-    if (!currentQuestion || !session) return;
-    submitAnswer("", session.id, session.currentTeamId!, currentQuestion.id);
-  }, [currentQuestion, session, submitAnswer]);
 
   const isMyTurn = playerTeamId ? session?.currentTeamId === playerTeamId : true;
 

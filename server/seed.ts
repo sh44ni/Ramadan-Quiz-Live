@@ -366,6 +366,8 @@ const questionsData = [
 export async function seedDatabase() {
   try {
     const existingTeams = await db.select().from(teams);
+    const existingQuestions = await db.select().from(questions);
+
     if (existingTeams.length > 0) {
       log("Teams exist, syncing team names...", "seed");
       for (const teamData of teamsData) {
@@ -374,6 +376,11 @@ export async function seedDatabase() {
           .where(eq(teams.color, teamData.color));
       }
       log("Team names synced successfully", "seed");
+
+      if (existingQuestions.length === 0) {
+        await db.insert(questions).values(questionsData);
+        log(`Inserted ${questionsData.length} questions`, "seed");
+      }
       return;
     }
 
@@ -382,8 +389,10 @@ export async function seedDatabase() {
     await db.insert(teams).values(teamsData);
     log(`Inserted ${teamsData.length} teams`, "seed");
 
-    await db.insert(questions).values(questionsData);
-    log(`Inserted ${questionsData.length} questions`, "seed");
+    if (existingQuestions.length === 0) {
+      await db.insert(questions).values(questionsData);
+      log(`Inserted ${questionsData.length} questions`, "seed");
+    }
 
     log("Database seeding complete!", "seed");
   } catch (error) {

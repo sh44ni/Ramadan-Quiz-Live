@@ -55,6 +55,7 @@ function startTimer(duration: number) {
       stopTimer();
       broadcast({ type: "timer-update", seconds: 0, running: false });
       broadcast({ type: "time-up" });
+      handleTimeUp();
     }
   }, 1000);
 }
@@ -65,6 +66,64 @@ function stopTimer() {
     timerInterval = null;
   }
   timerRunning = false;
+}
+
+async function handleTimeUp() {
+  try {
+    const session = await storage.getActiveSession();
+    if (!session || !session.currentQuestionId) return;
+
+    const alreadyAnswered = await storage.getAnsweredQuestionIds(session.id);
+    if (alreadyAnswered.includes(session.currentQuestionId)) return;
+
+    const question = await storage.getQuestion(session.currentQuestionId);
+    if (!question) return;
+
+    await storage.createQuestionHistory({
+      sessionId: session.id,
+      teamId: session.currentTeamId!,
+      questionId: session.currentQuestionId,
+      answerGiven: "",
+      isCorrect: false,
+    });
+
+    const teamScore = await storage.getTeamScore(session.id, session.currentTeamId!);
+    if (teamScore) {
+      await storage.updateTeamScore(teamScore.id, {
+        questionsAnswered: teamScore.questionsAnswered + 1,
+      });
+    }
+
+    broadcast({
+      type: "answer-result",
+      isCorrect: false,
+      correctAnswer: question.correctAnswer,
+      answerGiven: "",
+      teamId: session.currentTeamId!,
+    });
+
+    const teams = await storage.getTeams();
+    const currentIndex = teams.findIndex((t) => t.id === session.currentTeamId);
+    const nextTeam = teams[(currentIndex + 1) % teams.length];
+
+    const answeredIds = await storage.getAnsweredQuestionIds(session.id);
+    const allQuestions = await storage.getQuestions();
+
+    if (answeredIds.length >= allQuestions.length) {
+      await storage.updateSession(session.id, { status: "finished", currentQuestionId: null });
+      broadcast({ type: "game-finished" });
+    } else {
+      await storage.updateSession(session.id, {
+        currentTeamId: nextTeam.id,
+        currentQuestionId: null,
+      });
+      broadcast({ type: "turn-changed", teamId: nextTeam.id });
+    }
+
+    setTimeout(() => broadcastGameState(), 2500);
+  } catch (error) {
+    log(`Error handling time-up: ${error}`, "ws");
+  }
 }
 
 async function broadcastGameState() {
@@ -141,6 +200,9 @@ async function handleMessage(ws: WebSocket, raw: string) {
       case "submit-answer": {
         const { answer, sessionId, teamId, questionId } = msg;
         stopTimer();
+
+        const alreadyAnswered = await storage.getAnsweredQuestionIds(sessionId);
+        if (alreadyAnswered.includes(questionId)) return;
 
         const question = await storage.getQuestion(questionId);
         if (!question) return;
