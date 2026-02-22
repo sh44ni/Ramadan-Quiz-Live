@@ -57,6 +57,10 @@ import {
   ChevronUp,
   BookOpen,
   List,
+  Lightbulb,
+  Monitor as MonitorIcon,
+  Languages,
+  BarChart3,
 } from "lucide-react";
 import type { Team, GameSession, TeamScore, AuthorizedEmail, Category, Question } from "@shared/schema";
 
@@ -75,6 +79,7 @@ export default function Admin() {
   const [newTeamId, setNewTeamId] = useState<string>("");
   const [bulkText, setBulkText] = useState("");
   const [showBulk, setShowBulk] = useState(false);
+  const [showAdminGuide, setShowAdminGuide] = useState(false);
 
   const {
     gameState: wsGameState,
@@ -1229,6 +1234,122 @@ export default function Admin() {
                 )}
               </div>
             </div>
+          )}
+        </Card>
+
+        <Card className="p-4 space-y-3 lg:col-span-2" data-testid="admin-guide-section">
+          <button
+            className="w-full flex items-center justify-between"
+            onClick={() => setShowAdminGuide(!showAdminGuide)}
+            data-testid="button-toggle-admin-guide"
+          >
+            <h3 className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+              <BookOpen className="h-4 w-4 text-indigo-500" />
+              {t("adminGuide")}
+            </h3>
+            {showAdminGuide ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {showAdminGuide && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="space-y-4"
+            >
+              <p className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("adminGuideDesc")}</p>
+
+              <div className="space-y-3">
+                <div className="p-3 rounded-md bg-blue-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <Users className="h-3.5 w-3.5 text-blue-500" />
+                    {t("adminSetupTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("adminSetupStep1"), t("adminSetupStep2"), t("adminSetupStep3"), t("adminSetupStep4")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold text-primary/60 shrink-0">{i + 1}.</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-emerald-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <Play className="h-3.5 w-3.5 text-emerald-500" />
+                    {t("adminControlsTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("adminControlsStep1"), t("adminControlsStep2"), t("adminControlsStep3"), t("adminControlsStep4"), t("adminControlsStep5"), t("adminControlsStep6")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold text-primary/60 shrink-0">{i + 1}.</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-purple-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <HelpCircle className="h-3.5 w-3.5 text-purple-500" />
+                    {t("adminQuestionsTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("adminQuestionsStep1"), t("adminQuestionsStep2"), t("adminQuestionsStep3")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold text-primary/60 shrink-0">{i + 1}.</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-amber-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <BarChart3 className="h-3.5 w-3.5 text-amber-500" />
+                    {t("adminScoreTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("adminScoreStep1"), t("adminScoreStep2"), t("adminScoreStep3")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold text-primary/60 shrink-0">{i + 1}.</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-cyan-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <MonitorIcon className="h-3.5 w-3.5 text-cyan-500" />
+                    {t("adminDisplayTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("adminDisplayStep1"), t("adminDisplayStep2"), t("adminDisplayStep3")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold text-primary/60 shrink-0">{i + 1}.</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-amber-500/5 space-y-2">
+                  <h4 className={`text-xs font-semibold flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                    {t("tipsTitle")}
+                  </h4>
+                  <div className="space-y-1">
+                    {[t("tip1"), t("tip2"), t("tip3"), t("tip4"), t("tip5"), t("tip6")].map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="text-amber-500 shrink-0">&#x2022;</span>
+                        <span className={isRTL ? "font-arabic" : ""}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           )}
         </Card>
 

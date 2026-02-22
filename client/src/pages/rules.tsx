@@ -11,33 +11,16 @@ import {
   Mail,
   KeyRound,
   LogIn,
-  Grid3X3,
   Clock,
   CheckCircle2,
   XCircle,
   Trophy,
   BarChart3,
-  Shield,
-  UserPlus,
-  Play,
-  Pause,
-  SkipForward,
-  Square,
-  RotateCcw,
-  Plus,
-  Minus,
   HelpCircle,
-  Lock,
-  Lightbulb,
-  Monitor,
-  Languages,
-  Moon,
+  BookOpen,
   Star,
   Sparkles,
 } from "lucide-react";
-import { useState, useEffect } from "react";
-
-type SectionKey = "players" | "admin" | "tips";
 
 interface StepItem {
   icon: React.ElementType;
@@ -123,31 +106,6 @@ export default function Rules() {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
   const [, setLocation] = useLocation();
-  const [activeSection, setActiveSection] = useState<SectionKey>("players");
-
-  useEffect(() => {
-    document.title = isRTL
-      ? "كيف تلعب | مسابقة رمضان الثقافية"
-      : "How to Play | Ramadan Quiz Competition";
-    const metaDesc = document.querySelector('meta[name="description"]');
-    const desc = isRTL
-      ? "دليل شامل لمسابقة رمضان الثقافية - للاعبين والمشرفين"
-      : "Complete guide to the Ramadan Quiz Competition - for players and admins";
-    if (metaDesc) {
-      metaDesc.setAttribute("content", desc);
-    } else {
-      const meta = document.createElement("meta");
-      meta.name = "description";
-      meta.content = desc;
-      document.head.appendChild(meta);
-    }
-  }, [isRTL]);
-
-  const sections: { key: SectionKey; label: string; icon: React.ElementType; color: string }[] = [
-    { key: "players", label: t("sectionPlayers"), icon: Users, color: "text-blue-500" },
-    { key: "admin", label: t("sectionAdmin"), icon: Shield, color: "text-amber-500" },
-    { key: "tips", label: t("sectionTips"), icon: Lightbulb, color: "text-emerald-500" },
-  ];
 
   const playerSections = [
     {
@@ -165,14 +123,14 @@ export default function Rules() {
     {
       sectionId: "gameplay",
       title: t("gameplayTitle"),
-      titleIcon: Grid3X3,
+      titleIcon: HelpCircle,
       iconColor: "text-purple-500",
       steps: [
         { icon: Users, text: t("gameplayStep1") },
         { icon: HelpCircle, text: t("gameplayStep2") },
         { icon: Clock, text: t("gameplayStep3") },
         { icon: CheckCircle2, text: t("gameplayStep4") },
-        { icon: SkipForward, text: t("gameplayStep5") },
+        { icon: Trophy, text: t("gameplayStep5") },
       ],
     },
     {
@@ -181,7 +139,7 @@ export default function Rules() {
       titleIcon: Trophy,
       iconColor: "text-amber-500",
       steps: [
-        { icon: Plus, text: t("scoringStep1"), highlight: "+10" },
+        { icon: CheckCircle2, text: t("scoringStep1"), highlight: "+1" },
         { icon: XCircle, text: t("scoringStep2"), highlight: "0" },
         { icon: BarChart3, text: t("scoringStep3") },
         { icon: Trophy, text: t("scoringStep4") },
@@ -199,93 +157,19 @@ export default function Rules() {
       ],
     },
     {
-      sectionId: "question-grid",
-      title: t("questionGridTitle"),
-      titleIcon: Grid3X3,
+      sectionId: "categories",
+      title: t("categoriesTitle"),
+      titleIcon: BookOpen,
       iconColor: "text-indigo-500",
       steps: [
-        { icon: Grid3X3, text: t("questionGridStep1") },
-        { icon: HelpCircle, text: t("questionGridStep2") },
-        { icon: Lock, text: t("questionGridStep3") },
-        { icon: Star, text: t("questionGridStep4") },
+        { icon: Star, text: t("categoriesStep1") },
+        { icon: Star, text: t("categoriesStep2") },
+        { icon: Star, text: t("categoriesStep3") },
+        { icon: Star, text: t("categoriesStep4") },
+        { icon: Star, text: t("categoriesStep5") },
       ],
     },
   ];
-
-  const adminSections = [
-    {
-      sectionId: "admin-setup",
-      title: t("adminSetupTitle"),
-      titleIcon: UserPlus,
-      iconColor: "text-blue-500",
-      steps: [
-        { icon: Shield, text: t("adminSetupStep1") },
-        { icon: Mail, text: t("adminSetupStep2") },
-        { icon: Users, text: t("adminSetupStep3") },
-        { icon: Mail, text: t("adminSetupStep4") },
-      ],
-    },
-    {
-      sectionId: "admin-controls",
-      title: t("adminControlsTitle"),
-      titleIcon: Play,
-      iconColor: "text-emerald-500",
-      steps: [
-        { icon: Play, text: t("adminControlsStep1") },
-        { icon: Users, text: t("adminControlsStep2") },
-        { icon: Pause, text: t("adminControlsStep3") },
-        { icon: SkipForward, text: t("adminControlsStep4") },
-        { icon: Square, text: t("adminControlsStep5") },
-        { icon: RotateCcw, text: t("adminControlsStep6") },
-      ],
-    },
-    {
-      sectionId: "admin-questions",
-      title: t("adminQuestionsTitle"),
-      titleIcon: HelpCircle,
-      iconColor: "text-purple-500",
-      steps: [
-        { icon: Grid3X3, text: t("adminQuestionsStep1") },
-        { icon: Clock, text: t("adminQuestionsStep2") },
-        { icon: Lock, text: t("adminQuestionsStep3") },
-      ],
-    },
-    {
-      sectionId: "admin-score",
-      title: t("adminScoreTitle"),
-      titleIcon: BarChart3,
-      iconColor: "text-amber-500",
-      steps: [
-        { icon: Plus, text: t("adminScoreStep1") },
-        { icon: Minus, text: t("adminScoreStep2") },
-        { icon: BarChart3, text: t("adminScoreStep3") },
-      ],
-    },
-  ];
-
-  const tipsSections = [
-    {
-      sectionId: "tips",
-      title: t("tipsTitle"),
-      titleIcon: Lightbulb,
-      iconColor: "text-amber-500",
-      steps: [
-        { icon: Mail, text: t("tip1") },
-        { icon: Shield, text: t("tip2") },
-        { icon: Monitor, text: t("tip3") },
-        { icon: Pause, text: t("tip4") },
-        { icon: Users, text: t("tip5") },
-        { icon: Languages, text: t("tip6") },
-      ],
-    },
-  ];
-
-  const currentSections =
-    activeSection === "players"
-      ? playerSections
-      : activeSection === "admin"
-        ? adminSections
-        : tipsSections;
 
   return (
     <div className="min-h-[calc(100vh-52px)] flex flex-col">
@@ -330,7 +214,7 @@ export default function Rules() {
 
       <div className="flex-1 p-4 md:p-6 islamic-pattern">
         <div className="max-w-2xl mx-auto space-y-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="flex items-center gap-2 pb-1">
             <Button
               variant="outline"
               size="icon"
@@ -339,29 +223,13 @@ export default function Rules() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-
-            <div className="flex gap-2 flex-1 justify-center">
-              {sections.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeSection === section.key;
-                return (
-                  <Button
-                    key={section.key}
-                    variant={isActive ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveSection(section.key)}
-                    data-testid={`button-section-${section.key}`}
-                  >
-                    <Icon className={`h-4 w-4 ${!isActive ? section.color : ""}`} />
-                    <span className={isRTL ? "font-arabic" : ""}>{section.label}</span>
-                  </Button>
-                );
-              })}
-            </div>
+            <h2 className={`text-sm font-medium text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+              {t("sectionPlayers")}
+            </h2>
           </div>
 
           <div className="space-y-4">
-            {currentSections.map((section, i) => (
+            {playerSections.map((section, i) => (
               <SectionBlock
                 key={section.sectionId}
                 sectionId={section.sectionId}
