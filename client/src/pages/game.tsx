@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { motion, AnimatePresence } from "framer-motion";
-import { QuestionGrid } from "@/components/question-grid";
 import { QuestionDisplay } from "@/components/question-display";
 import { Scoreboard } from "@/components/scoreboard";
 import { Card } from "@/components/ui/card";
@@ -25,7 +24,7 @@ export default function Game() {
   const [playerTeamId, setPlayerTeamId] = useState<number | null>(null);
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
 
-  const { gameState, timer, answerResult, connected, selectQuestion, submitAnswer } = useGameSocket();
+  const { gameState, timer, answerResult, connected, submitAnswer } = useGameSocket();
   const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
   const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
 
@@ -69,7 +68,7 @@ export default function Game() {
       const timeout = setTimeout(() => {
         setShowResult(null);
         setSelectedAnswer(null);
-      }, 2500);
+      }, 4000);
       return () => clearTimeout(timeout);
     }
   }, [answerResult]);
@@ -79,14 +78,6 @@ export default function Game() {
       setLocation("/results");
     }
   }, [isAuthorized, session?.status, setLocation]);
-
-  const handleSelectQuestion = useCallback(
-    (questionId: number) => {
-      if (!session) return;
-      selectQuestion(questionId, session.id);
-    },
-    [session, selectQuestion],
-  );
 
   const handleAnswer = useCallback(
     (answer: string) => {
@@ -318,7 +309,10 @@ export default function Game() {
                         <span className={`text-xs font-medium ${
                           timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
                         }`}>
-                          {timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut")}
+                          {timer.running
+                            ? (timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut"))
+                            : t("waitingForTimer")
+                          }
                         </span>
                       </div>
                       <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
@@ -339,20 +333,26 @@ export default function Game() {
                   onAnswer={handleAnswer}
                   showResult={showResult}
                   correctAnswer={showResult ? (answerResult?.correctAnswer || currentQuestion.correctAnswer) : null}
-                  disabled={!!selectedAnswer || !isMyTurn}
+                  disabled={!!selectedAnswer || !isMyTurn || !timer.running}
                   selectedAnswer={selectedAnswer || (answerResult?.answerGiven || null)}
                 />
               </motion.div>
             ) : (
-              <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Card className="p-4">
-                  <QuestionGrid
-                    questionIds={questions.map((q) => q.id)}
-                    answeredQuestions={answeredQuestionIds}
-                    currentQuestion={null}
-                    onSelectQuestion={handleSelectQuestion}
-                    disabled={session.status !== "active" || !isMyTurn}
-                  />
+              <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Card className="p-8 md:p-12 text-center">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="mb-4"
+                  >
+                    <Sparkles className="h-12 w-12 text-amber-400/50 mx-auto" />
+                  </motion.div>
+                  <h3 className={`text-lg font-semibold text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                    {isMyTurn ? t("waitingForQuestion") : t("waitingForTurn")}
+                  </h3>
+                  <p className={`text-sm text-muted-foreground/70 mt-2 ${isRTL ? "font-arabic" : ""}`}>
+                    {t("adminWillSelectQuestion")}
+                  </p>
                 </Card>
               </motion.div>
             )}

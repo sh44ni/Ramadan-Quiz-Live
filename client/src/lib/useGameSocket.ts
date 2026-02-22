@@ -63,7 +63,7 @@ export function useGameSocket() {
             break;
           case "answer-result":
             setAnswerResult(msg);
-            setTimeout(() => setAnswerResult(null), 2500);
+            setTimeout(() => setAnswerResult(null), 4000);
             break;
           case "question-selected":
             break;
@@ -124,6 +124,10 @@ export function useGameSocket() {
   const adminSkip = useCallback(() => send({ type: "admin-skip" }), [send]);
   const adminSetTeam = useCallback((teamId: number) => send({ type: "admin-set-team", teamId }), [send]);
   const adminAdjustScore = useCallback((teamId: number, points: number) => send({ type: "admin-adjust-score", teamId, points }), [send]);
+  const adminNextQuestion = useCallback(() => send({ type: "admin-next-question" }), [send]);
+  const adminStartTimer = useCallback(() => send({ type: "admin-start-timer" }), [send]);
+  const adminShowAnswer = useCallback(() => send({ type: "admin-show-answer" }), [send]);
+  const adminResetTimer = useCallback(() => send({ type: "admin-reset-timer" }), [send]);
 
   return {
     gameState,
@@ -140,5 +144,9 @@ export function useGameSocket() {
     adminSkip,
     adminSetTeam,
     adminAdjustScore,
+    adminNextQuestion,
+    adminStartTimer,
+    adminShowAnswer,
+    adminResetTimer,
   };
 }

@@ -48,6 +48,9 @@ import {
   Monitor,
   Wifi,
   WifiOff,
+  Timer,
+  ArrowRight,
+  CircleStop,
 } from "lucide-react";
 import type { Team, GameSession, TeamScore, AuthorizedEmail } from "@shared/schema";
 
@@ -69,6 +72,8 @@ export default function Admin() {
 
   const {
     gameState: wsGameState,
+    timer: wsTimer,
+    answerResult: wsAnswerResult,
     connected: wsConnected,
     adminStart,
     adminPause,
@@ -78,6 +83,10 @@ export default function Admin() {
     adminSkip,
     adminSetTeam,
     adminAdjustScore,
+    adminNextQuestion,
+    adminStartTimer,
+    adminShowAnswer,
+    adminResetTimer,
   } = useGameSocket();
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
@@ -323,14 +332,18 @@ export default function Admin() {
     );
   }
 
-  const session = sessionData?.session;
-  const scores = sessionData?.scores || [];
-  const teams = teamsData || [];
+  const session = wsGameState.session;
+  const scores = wsGameState.scores || [];
+  const teams = teamsData || wsGameState.teams || [];
   const authorizedEmails = authorizedEmailsData || [];
-  const totalQuestions = questionsData?.length || 36;
-  const answeredCount = sessionData?.answeredQuestionIds?.length || 0;
+  const allQuestions = questionsData || wsGameState.questions || [];
+  const totalQuestions = allQuestions.length || 36;
+  const answeredQuestionIds = wsGameState.answeredQuestionIds || [];
+  const answeredCount = answeredQuestionIds.length;
+  const currentQuestion = wsGameState.currentQuestion;
+  const currentTeam = teams.find((t: Team) => t.id === session?.currentTeamId);
 
-  const isLoading = sessionLoading || teamsLoading;
+  const isLoading = teamsLoading;
 
   if (isLoading) {
     return (
@@ -363,10 +376,15 @@ export default function Admin() {
           : t("waiting");
 
   const getTeamName = (teamId: number) => {
-    const team = teams.find((t) => t.id === teamId);
+    const team = teams.find((t: Team) => t.id === teamId);
     if (!team) return "";
     return language === "ar" ? team.nameAr : team.nameEn;
   };
+
+  const nextUnansweredQuestion = allQuestions.find((q: any) => !answeredQuestionIds.includes(q.id));
+  const questionIndex = currentQuestion
+    ? allQuestions.findIndex((q: any) => q.id === currentQuestion.id) + 1
+    : 0;
 
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
@@ -518,7 +536,7 @@ export default function Admin() {
                 {t("setCurrentTeam") || "Set Current Team"}
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {teams.map((team) => (
+                {teams.map((team: Team) => (
                   <Button
                     key={team.id}
                     size="sm"
@@ -536,6 +554,138 @@ export default function Admin() {
           )}
         </Card>
 
+        {session && (session.status === "active" || session.status === "paused") && (
+          <Card className="p-4 space-y-4 ring-2 ring-amber-500/30">
+            <h3
+              className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
+            >
+              <HelpCircle className="h-4 w-4 text-blue-500" />
+              {t("questionControl")}
+            </h3>
+
+            {currentTeam && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs" style={{ backgroundColor: currentTeam.color }}>
+                  <Users className="h-3 w-3" />
+                </div>
+                <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
+                  {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
+                </span>
+                <Badge variant="secondary" className="text-xs ms-auto">{t("currentTeam")}</Badge>
+              </div>
+            )}
+
+            {currentQuestion ? (
+              <div className="space-y-3">
+                <div className="p-3 rounded-md bg-primary/5 border border-primary/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Sparkles className="h-3 w-3 text-amber-500" />
+                      {t("questionNumber")}{questionIndex}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {language === "ar" ? currentQuestion.categoryAr : currentQuestion.categoryEn}
+                    </Badge>
+                  </div>
+                  <p className={`text-sm font-medium leading-relaxed ${isRTL ? "font-arabic text-right" : ""}`} data-testid="text-admin-question">
+                    {language === "ar" ? currentQuestion.textAr : currentQuestion.textEn}
+                  </p>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <span className="font-medium">{t("correctAnswerLabel")}:</span>{" "}
+                    <span className="font-bold text-emerald-600">{currentQuestion.correctAnswer.toUpperCase()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-amber-500" />
+                    <span className={`text-lg font-bold tabular-nums ${
+                      wsTimer.seconds > 20 ? "text-emerald-500" : wsTimer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                    }`}>
+                      {wsTimer.seconds}s
+                    </span>
+                  </div>
+                  <Badge variant={wsTimer.running ? "default" : "secondary"} className="text-xs">
+                    {wsTimer.running ? t("timerRunning") : t("timerStopped")}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() => adminStartTimer()}
+                    disabled={wsTimer.running}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    data-testid="button-start-timer"
+                  >
+                    <Play className="h-4 w-4" />
+                    <span className={isRTL ? "font-arabic" : ""}>{t("startTimer")}</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => adminResetTimer()}
+                    data-testid="button-reset-timer"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span className={isRTL ? "font-arabic" : ""}>{t("resetTimer")}</span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => adminShowAnswer()}
+                    className="col-span-2"
+                    data-testid="button-show-answer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span className={isRTL ? "font-arabic" : ""}>{t("showAnswer")}</span>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 rounded-md bg-muted/20 text-center">
+                  <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                    {nextUnansweredQuestion
+                      ? `${t("nextQuestionPreview")}: ${language === "ar" ? nextUnansweredQuestion.categoryAr : nextUnansweredQuestion.categoryEn}`
+                      : t("allQuestionsAnswered")}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => adminNextQuestion()}
+                  disabled={!nextUnansweredQuestion}
+                  className="w-full gold-gradient border-amber-400/30 text-white font-bold"
+                  data-testid="button-next-question"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  <span className={isRTL ? "font-arabic" : ""}>{t("nextQuestion")}</span>
+                </Button>
+              </div>
+            )}
+
+            {wsAnswerResult && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`flex items-center justify-center gap-2 p-3 rounded-md font-bold ${
+                  wsAnswerResult.isCorrect
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : "bg-red-500/15 text-red-600"
+                }`}
+              >
+                {wsAnswerResult.isCorrect ? (
+                  <><CheckCircle2 className="h-5 w-5" /> {t("correct")} +1</>
+                ) : (
+                  <><CircleStop className="h-5 w-5" /> {t("incorrect")}</>
+                )}
+              </motion.div>
+            )}
+          </Card>
+        )}
+
+        {!(session && (session.status === "active" || session.status === "paused")) && (
+          <Card className="p-4">
+            <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} compact />
+          </Card>
+        )}
+
         <Card className="p-4">
           <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} compact />
         </Card>
@@ -548,8 +698,8 @@ export default function Admin() {
             {t("adjustScore")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {teams.map((team) => {
-              const teamScore = scores.find(s => s.teamId === team.id);
+            {teams.map((team: Team) => {
+              const teamScore = scores.find((s: TeamScore) => s.teamId === team.id);
               return (
                 <div
                   key={team.id}
@@ -570,7 +720,7 @@ export default function Admin() {
                       size="icon"
                       variant="outline"
                       onClick={() => {
-                        adminAdjustScore(team.id, -10);
+                        adminAdjustScore(team.id, -1);
                         setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500);
                       }}
                       data-testid={`button-remove-points-${team.id}`}
@@ -581,7 +731,7 @@ export default function Admin() {
                       size="icon"
                       variant="outline"
                       onClick={() => {
-                        adminAdjustScore(team.id, 10);
+                        adminAdjustScore(team.id, 1);
                         setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500);
                       }}
                       data-testid={`button-add-points-${team.id}`}
@@ -603,7 +753,7 @@ export default function Admin() {
             {t("teamRoster")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {teams.map((team) => (
+            {teams.map((team: Team) => (
               <Card key={team.id} className="p-0 overflow-visible relative">
                 <div
                   className="absolute top-0 left-0 right-0 h-1 rounded-t-md"
@@ -719,7 +869,7 @@ export default function Admin() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{t("noTeam")}</SelectItem>
-                  {teams.map((team) => (
+                  {teams.map((team: Team) => (
                     <SelectItem key={team.id} value={String(team.id)}>
                       {language === "ar" ? team.nameAr : team.nameEn}
                     </SelectItem>

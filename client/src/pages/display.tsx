@@ -43,9 +43,9 @@ export default function Display() {
   const maxScore = Math.max(...sortedTeams.map((t) => scores.find((s) => s.teamId === t.id)?.score || 0), 1);
 
   const getTimerColor = () => {
-    if (timer.seconds > 20) return "text-emerald-500";
-    if (timer.seconds > 10) return "text-amber-500";
-    return "text-red-500";
+    if (timer.seconds > 20) return "text-emerald-400";
+    if (timer.seconds > 10) return "text-amber-400";
+    return "text-red-400";
   };
 
   const getTimerStroke = () => {
@@ -54,7 +54,7 @@ export default function Display() {
     return "#ef4444";
   };
 
-  const circumference = 2 * Math.PI * 54;
+  const circumference = 2 * Math.PI * 70;
   const strokeDashoffset = circumference - ((timer.seconds / 30) * circumference);
 
   const getRankIcon = (index: number) => {
@@ -263,13 +263,13 @@ export default function Display() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <div className="relative w-16 h-16 shrink-0">
-                        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 120 120">
-                          <circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,0.15)" strokeWidth="5" fill="none" />
+                      <div className="relative w-24 h-24 shrink-0">
+                        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 160 160">
+                          <circle cx="80" cy="80" r="70" stroke="rgba(255,255,255,0.15)" strokeWidth="6" fill="none" />
                           <motion.circle
-                            cx="60" cy="60" r="54"
+                            cx="80" cy="80" r="70"
                             stroke={getTimerStroke()}
-                            strokeWidth="5"
+                            strokeWidth="6"
                             fill="none"
                             strokeLinecap="round"
                             strokeDasharray={circumference}
@@ -278,9 +278,16 @@ export default function Display() {
                           />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={`text-xl font-bold tabular-nums ${getTimerColor()} ${timer.seconds <= 5 ? "animate-pulse" : ""}`} data-testid="display-timer">
+                          <motion.span
+                            key={timer.seconds}
+                            initial={timer.seconds <= 5 ? { scale: 1.3 } : { scale: 1 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                            className={`text-3xl font-bold tabular-nums ${getTimerColor()} ${timer.seconds <= 5 && timer.running ? "animate-pulse" : ""}`}
+                            data-testid="display-timer"
+                          >
                             {timer.seconds}
-                          </span>
+                          </motion.span>
                         </div>
                       </div>
                     </div>
@@ -320,10 +327,22 @@ export default function Display() {
                           {option.text}
                         </span>
                         {answerResult && option.key === answerResult.correctAnswer && (
-                          <CheckCircle2 className="h-6 w-6 text-emerald-400 shrink-0" />
+                          <motion.div
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                          >
+                            <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
+                          </motion.div>
                         )}
                         {answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect && (
-                          <XCircle className="h-6 w-6 text-red-400 shrink-0" />
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                          >
+                            <XCircle className="h-8 w-8 text-red-400 shrink-0" />
+                          </motion.div>
                         )}
                       </motion.div>
                     ))}
@@ -332,26 +351,44 @@ export default function Display() {
                   <AnimatePresence>
                     {answerResult && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        className={`flex items-center justify-center gap-4 p-6 rounded-xl text-center font-bold text-2xl ${
+                        initial={{ opacity: 0, scale: 0.5, y: 30 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.5, y: -30 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                        className={`flex items-center justify-center gap-6 p-8 rounded-xl text-center font-bold ${
                           answerResult.isCorrect
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
-                            : "bg-red-500/20 text-red-300 border border-red-400/30"
+                            ? "bg-emerald-500/25 text-emerald-300 border-2 border-emerald-400/40"
+                            : "bg-red-500/25 text-red-300 border-2 border-red-400/40"
                         }`}
                         data-testid="display-result"
                       >
                         {answerResult.isCorrect ? (
                           <>
-                            <CheckCircle2 className="h-10 w-10" />
-                            <span className={isRTL ? "font-arabic" : ""}>{t("correct")}</span>
-                            <span className="text-3xl">+10</span>
+                            <motion.div
+                              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.3, 1] }}
+                              transition={{ duration: 0.6, repeat: 2 }}
+                            >
+                              <CheckCircle2 className="h-14 w-14" />
+                            </motion.div>
+                            <span className={`text-4xl ${isRTL ? "font-arabic" : ""}`}>{t("correct")}</span>
+                            <motion.span
+                              initial={{ scale: 0 }}
+                              animate={{ scale: [0, 1.5, 1] }}
+                              transition={{ delay: 0.3, duration: 0.5 }}
+                              className="text-5xl"
+                            >
+                              +1
+                            </motion.span>
                           </>
                         ) : (
                           <>
-                            <XCircle className="h-10 w-10" />
-                            <span className={isRTL ? "font-arabic" : ""}>{t("incorrect")}</span>
+                            <motion.div
+                              animate={{ x: [-5, 5, -5, 5, 0] }}
+                              transition={{ duration: 0.5, repeat: 1 }}
+                            >
+                              <XCircle className="h-14 w-14" />
+                            </motion.div>
+                            <span className={`text-4xl ${isRTL ? "font-arabic" : ""}`}>{t("incorrect")}</span>
                           </>
                         )}
                       </motion.div>
@@ -373,7 +410,7 @@ export default function Display() {
                     <Sparkles className="h-16 w-16 text-amber-400/50" />
                   </motion.div>
                   <p className={`text-2xl text-white/60 font-medium ${isRTL ? "font-arabic" : ""}`} data-testid="display-waiting-selection">
-                    {t("waitingForSelection") || "Waiting for team to select a question..."}
+                    {t("waitingForAdmin") || "Waiting for the next question..."}
                   </p>
                   {currentTeam && (
                     <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10">
@@ -442,8 +479,9 @@ export default function Display() {
                       </span>
                       <motion.span
                         key={score}
-                        initial={{ scale: 1.3 }}
+                        initial={{ scale: 1.5 }}
                         animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 300 }}
                         className="text-base font-bold text-amber-400 tabular-nums"
                       >
                         {score}

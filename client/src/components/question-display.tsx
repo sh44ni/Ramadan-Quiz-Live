@@ -170,11 +170,12 @@ export function QuestionDisplay({
                 </motion.div>
                 <span className={isRTL ? "font-arabic" : ""}>{t("correct")}</span>
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: [0, 1.5, 1] }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
                   className="text-2xl"
                 >
-                  +10
+                  +1
                 </motion.div>
               </>
             ) : (

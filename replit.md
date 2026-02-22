@@ -29,7 +29,7 @@ client/src/
   pages/
     welcome.tsx             - Landing page with rules and navigation
     login.tsx               - Email OTP login for players
-    game.tsx                - Team device view (select questions, answer)
+    game.tsx                - Team device view (current question, answer)
     display.tsx             - Audience display screen (fullscreen, no header)
     admin.tsx               - Admin control panel with WebSocket controls
     results.tsx             - Final results/leaderboard
@@ -56,10 +56,10 @@ The app is designed for a live event with two types of screens:
 ### Team Devices (`/game`)
 - Used by each team captain on a phone/tablet
 - Players must authenticate via email OTP at `/login`
-- On their turn: shows a question grid to select from
-- After selecting: shows the question with 4 answer options
+- On their turn: shows the current question with 4 answer options (admin selects questions)
 - Timer bar shows countdown (synced via WebSocket from server)
 - When it's not their turn: shows "waiting for your turn" message
+- Simplified UI: no question grid, just current question or waiting state
 - Automatically receives score updates and turn changes in real-time
 
 ### Audience Display Screen (`/display`)
@@ -68,7 +68,7 @@ The app is designed for a live event with two types of screens:
 - Open `/display` in a browser on the projector/TV computer
 - Shows in real-time:
   - Current team name and color indicator
-  - Question text (when selected by a team)
+  - Question text (when selected by admin)
   - Circular countdown timer with color changes (green > yellow > red)
   - Answer options with correct/incorrect highlighting after submission
   - Live leaderboard sidebar with score bars and rank icons
@@ -81,14 +81,20 @@ The app is designed for a live event with two types of screens:
 
 ### Admin Panel (`/admin`)
 - Password-protected (uses SESSION_SECRET environment variable)
+- **Admin-controlled workflow**: Admin drives all question selection and timing
 - All game controls operate via WebSocket for instant effect:
   - **Start New Game**: Creates a new session, initializes scores for all 6 teams
+  - **Next Question**: Selects the next sequential question for the current team
+  - **Start Timer**: Manually starts the 30-second countdown
+  - **Show Answer**: Reveals correct answer (when timer hasn't started or for manual reveal)
+  - **Reset Timer**: Resets timer back to 30 seconds
   - **Pause/Resume**: Freezes/continues the timer and game state
   - **Skip**: Moves to the next team without answering
   - **End Game**: Finishes the game, triggers results display
   - **Reset**: Ends current session and clears state
   - **Set Current Team**: Manually select which team goes next
-  - **Adjust Score**: Add or remove points for any team (+/- 10)
+  - **Adjust Score**: Add or remove points for any team (+/- 1)
+- Question Control section shows current question preview with category badge
 - Has a "Display Screen" button to open `/display` in a new tab
 - Shows live game status, current team, and all team scores
 
@@ -97,7 +103,7 @@ The app is designed for a live event with two types of screens:
 ### Server (`server/websocket.ts`)
 - WebSocket server at path `/ws`
 - **Server-side timer**: Countdown runs on the server and broadcasts to all clients, ensuring perfect synchronization with no client drift
-- **Auto time-up handling**: When timer hits 0, server automatically submits an empty answer, shows the correct answer, and rotates to the next team
+- **Auto time-up handling**: When timer hits 0, server automatically submits an empty answer and shows the correct answer (admin controls progression to next question/team)
 - **Race condition prevention**: Duplicate answer guards prevent double-submission if timer and user answer race
 
 ### Client Hook (`client/src/lib/useGameSocket.ts`)
@@ -112,7 +118,11 @@ The app is designed for a live event with two types of screens:
 | `game-state` | Server → Client | Full game state update (session, scores, teams, questions, current question) |
 | `timer-update` | Server → Client | Timer tick with seconds and running status |
 | `select-question` | Client → Server | Team selects a question from grid |
-| `question-selected` | Server → All | Question was selected, starts timer |
+| `question-selected` | Server → All | Question was selected (timer NOT auto-started) |
+| `admin-next-question` | Client → Server | Admin selects next sequential question |
+| `admin-start-timer` | Client → Server | Admin manually starts 30s countdown |
+| `admin-show-answer` | Client → Server | Admin reveals correct answer |
+| `admin-reset-timer` | Client → Server | Admin resets timer to 30s |
 | `submit-answer` | Client → Server | Team submits answer |
 | `answer-result` | Server → All | Answer result with correct/incorrect and correct answer |
 | `turn-changed` | Server → All | Next team's turn |
@@ -149,13 +159,13 @@ The app is designed for a live event with two types of screens:
 1. Admin opens `/admin` and logs in with password (SESSION_SECRET env var)
 2. Admin clicks "Start New Game" - creates session, initializes all team scores
 3. Display screen (`/display`) on projector shows the game live
-4. Team captains on their devices (`/game`) see the question grid on their turn
-5. Current team selects a question from the grid
+4. Team captains on their devices (`/game`) see the current question when it's their turn
+5. Admin clicks "Next Question" to select the next sequential question for the current team
 6. Question appears on all screens simultaneously via WebSocket
-7. 30-second server-side timer counts down (synced to all devices)
+7. Admin clicks "Start Timer" to begin the 30-second countdown
 8. Team submits answer OR timer expires (server auto-handles time-up)
-9. Result shown: correct (+10 points) or incorrect (0 points), correct answer revealed
-10. Auto-rotation to next team after 2.5 second result display
+9. Result shown: correct (+1 point) or incorrect (0 points), correct answer revealed with 4-second feedback animation
+10. Admin clicks "Next Question" to continue, auto-rotates to next team after each team's set of questions
 11. Game ends when all 36 questions answered or admin ends manually
 12. Final results shown on `/results` page with rankings
 
