@@ -12,6 +12,13 @@ export const teams = pgTable("teams", {
   members: text("members").array().notNull().default(sql`'{}'::text[]`),
 });
 
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(),
+  color: text("color").notNull().default("#6B7280"),
+});
+
 export const questions = pgTable("questions", {
   id: serial("id").primaryKey(),
   textEn: text("text_en").notNull(),
@@ -28,6 +35,7 @@ export const questions = pgTable("questions", {
   categoryEn: text("category_en").notNull(),
   categoryAr: text("category_ar").notNull(),
   difficulty: text("difficulty").notNull().default("medium"),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const gameSessions = pgTable("game_sessions", {
@@ -59,6 +67,7 @@ export const questionHistory = pgTable("question_history", {
 });
 
 export const insertTeamSchema = createInsertSchema(teams).omit({ id: true });
+export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
 export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true });
 export const insertGameSessionSchema = createInsertSchema(gameSessions).omit({ id: true, createdAt: true });
 export const insertTeamScoreSchema = createInsertSchema(teamScores).omit({ id: true });
@@ -66,6 +75,8 @@ export const insertQuestionHistorySchema = createInsertSchema(questionHistory).o
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Question = typeof questions.$inferSelect;
 export type InsertQuestion = z.infer<typeof insertQuestionSchema>;
 export type GameSession = typeof gameSessions.$inferSelect;

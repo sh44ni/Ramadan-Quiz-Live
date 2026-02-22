@@ -25,6 +25,7 @@ type WSMessage =
   | { type: "admin-set-team"; teamId: number }
   | { type: "admin-adjust-score"; teamId: number; points: number }
   | { type: "admin-next-question" }
+  | { type: "admin-select-specific-question"; questionId: number }
   | { type: "admin-start-timer" }
   | { type: "admin-show-answer" }
   | { type: "admin-reset-timer" }
@@ -312,6 +313,22 @@ async function handleMessage(ws: WebSocket, raw: string) {
         await storage.updateSession(session.id, { currentQuestionId: nextQ.id });
         currentTimerSeconds = 30;
         broadcast({ type: "question-selected", question: nextQ, questionId: nextQ.id });
+        broadcast({ type: "timer-update", seconds: 30, running: false });
+        await broadcastGameState();
+        break;
+      }
+
+      case "admin-select-specific-question": {
+        const session = await storage.getActiveSession();
+        if (!session) return;
+        stopTimer();
+
+        const question = await storage.getQuestion(msg.questionId);
+        if (!question) return;
+
+        await storage.updateSession(session.id, { currentQuestionId: question.id });
+        currentTimerSeconds = 30;
+        broadcast({ type: "question-selected", question, questionId: question.id });
         broadcast({ type: "timer-update", seconds: 30, running: false });
         await broadcastGameState();
         break;

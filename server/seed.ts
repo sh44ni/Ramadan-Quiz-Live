@@ -1,7 +1,15 @@
 import { db } from "./db";
-import { teams, questions } from "@shared/schema";
+import { teams, questions, categories } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { log } from "./index";
+
+const categoriesData = [
+  { nameEn: "Quran & Hadith", nameAr: "القرآن والحديث", color: "#10B981" },
+  { nameEn: "Islamic History", nameAr: "التاريخ الإسلامي", color: "#8B5CF6" },
+  { nameEn: "Omani Culture", nameAr: "الثقافة العُمانية", color: "#3B82F6" },
+  { nameEn: "Arabic Language", nameAr: "اللغة العربية", color: "#F59E0B" },
+  { nameEn: "General Knowledge", nameAr: "معلومات عامة", color: "#EF4444" },
+];
 
 const teamsData = [
   {
@@ -365,6 +373,12 @@ const questionsData = [
 
 export async function seedDatabase() {
   try {
+    const existingCategories = await db.select().from(categories);
+    if (existingCategories.length === 0) {
+      await db.insert(categories).values(categoriesData);
+      log(`Inserted ${categoriesData.length} categories`, "seed");
+    }
+
     const existingTeams = await db.select().from(teams);
     const existingQuestions = await db.select().from(questions);
 

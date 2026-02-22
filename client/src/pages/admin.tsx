@@ -51,8 +51,14 @@ import {
   Timer,
   ArrowRight,
   CircleStop,
+  Search,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  List,
 } from "lucide-react";
-import type { Team, GameSession, TeamScore, AuthorizedEmail } from "@shared/schema";
+import type { Team, GameSession, TeamScore, AuthorizedEmail, Category, Question } from "@shared/schema";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -88,7 +94,32 @@ export default function Admin() {
     adminStartTimer,
     adminShowAnswer,
     adminResetTimer,
+    adminSelectSpecificQuestion,
   } = useGameSocket();
+
+  const [qbSearch, setQbSearch] = useState("");
+  const [qbCategoryFilter, setQbCategoryFilter] = useState("all");
+  const [qbDifficultyFilter, setQbDifficultyFilter] = useState("all");
+  const [qbExpanded, setQbExpanded] = useState(false);
+  const [qbShowForm, setQbShowForm] = useState(false);
+  const [qbEditingId, setQbEditingId] = useState<number | null>(null);
+  const [qbForm, setQbForm] = useState({
+    textEn: "", textAr: "",
+    optionAEn: "", optionAAr: "",
+    optionBEn: "", optionBAr: "",
+    optionCEn: "", optionCAr: "",
+    optionDEn: "", optionDAr: "",
+    correctAnswer: "a",
+    categoryEn: "", categoryAr: "",
+    difficulty: "medium",
+  });
+  const [catFormNameEn, setCatFormNameEn] = useState("");
+  const [catFormNameAr, setCatFormNameAr] = useState("");
+  const [catFormColor, setCatFormColor] = useState("#6B7280");
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [msExpanded, setMsExpanded] = useState(true);
+  const [msCategoryFilter, setMsCategoryFilter] = useState("all");
+  const [msDifficultyFilter, setMsDifficultyFilter] = useState("all");
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -129,6 +160,90 @@ export default function Admin() {
     queryFn: async () => {
       const res = await adminFetch("GET", "/api/admin/authorized-emails");
       return res.json();
+    },
+  });
+
+  const { data: categoriesData } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    enabled: isAuthenticated,
+  });
+
+  const createQuestionMutation = useMutation({
+    mutationFn: async (body: typeof qbForm) => {
+      const res = await adminFetch("POST", "/api/questions", { ...body, isActive: true });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      setQbShowForm(false);
+      setQbEditingId(null);
+      setQbForm({ textEn: "", textAr: "", optionAEn: "", optionAAr: "", optionBEn: "", optionBAr: "", optionCEn: "", optionCAr: "", optionDEn: "", optionDAr: "", correctAnswer: "a", categoryEn: "", categoryAr: "", difficulty: "medium" });
+      toast({ title: t("questionAdded"), description: t("questionAddedDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateQuestionMutation = useMutation({
+    mutationFn: async ({ id, body }: { id: number; body: typeof qbForm }) => {
+      const res = await adminFetch("PUT", `/api/questions/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      setQbShowForm(false);
+      setQbEditingId(null);
+      setQbForm({ textEn: "", textAr: "", optionAEn: "", optionAAr: "", optionBEn: "", optionBAr: "", optionCEn: "", optionCAr: "", optionDEn: "", optionDAr: "", correctAnswer: "a", categoryEn: "", categoryAr: "", difficulty: "medium" });
+      toast({ title: t("questionUpdated"), description: t("questionUpdatedDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminFetch("DELETE", `/api/questions/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      toast({ title: t("questionDeleted"), description: t("questionDeletedDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch("POST", "/api/categories", { nameEn: catFormNameEn, nameAr: catFormNameAr, color: catFormColor });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      setCatFormNameEn("");
+      setCatFormNameAr("");
+      setCatFormColor("#6B7280");
+      toast({ title: t("categoryAdded"), description: t("categoryAddedDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminFetch("DELETE", `/api/categories/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      toast({ title: t("categoryDeleted"), description: t("categoryDeletedDesc") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -662,13 +777,6 @@ export default function Admin() {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="p-4 rounded-md bg-muted/20 text-center">
-                  <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                    {nextUnansweredQuestion
-                      ? `${t("nextQuestionPreview")}: ${language === "ar" ? nextUnansweredQuestion.categoryAr : nextUnansweredQuestion.categoryEn}`
-                      : t("allQuestionsAnswered")}
-                  </p>
-                </div>
                 <Button
                   onClick={() => adminNextQuestion()}
                   disabled={!nextUnansweredQuestion || !!wsTeamCompleted}
@@ -678,6 +786,78 @@ export default function Admin() {
                   <ArrowRight className="h-4 w-4" />
                   <span className={isRTL ? "font-arabic" : ""}>{t("nextQuestion")}</span>
                 </Button>
+
+                <div className="border-t pt-3">
+                  <button
+                    onClick={() => setMsExpanded(!msExpanded)}
+                    className="flex items-center justify-between gap-2 w-full text-left"
+                    data-testid="button-toggle-manual-select"
+                  >
+                    <span className={`text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 ${isRTL ? "font-arabic" : ""}`}>
+                      <List className="h-3.5 w-3.5" />
+                      {t("selectQuestionForTeam")}
+                    </span>
+                    {msExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+
+                  {msExpanded && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <Select value={msCategoryFilter} onValueChange={setMsCategoryFilter}>
+                          <SelectTrigger className="flex-1 min-w-[120px]" data-testid="select-ms-category">
+                            <SelectValue placeholder={t("filterByCategory")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("allCategories")}</SelectItem>
+                            {(categoriesData || []).map((cat: Category) => (
+                              <SelectItem key={cat.id} value={cat.nameEn}>{language === "ar" ? cat.nameAr : cat.nameEn}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={msDifficultyFilter} onValueChange={setMsDifficultyFilter}>
+                          <SelectTrigger className="flex-1 min-w-[100px]" data-testid="select-ms-difficulty">
+                            <SelectValue placeholder={t("filterByDifficulty")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("allDifficulties")}</SelectItem>
+                            <SelectItem value="easy">{t("easy")}</SelectItem>
+                            <SelectItem value="medium">{t("medium")}</SelectItem>
+                            <SelectItem value="hard">{t("hard")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto space-y-1">
+                        {allQuestions
+                          .filter((q: Question) => msCategoryFilter === "all" || q.categoryEn === msCategoryFilter)
+                          .filter((q: Question) => msDifficultyFilter === "all" || q.difficulty === msDifficultyFilter)
+                          .map((q: Question) => {
+                            const isUsed = answeredQuestionIds.includes(q.id);
+                            return (
+                              <button
+                                key={q.id}
+                                onClick={() => adminSelectSpecificQuestion(q.id)}
+                                className={`w-full text-left p-2 rounded-md text-xs flex items-start gap-2 hover-elevate ${
+                                  isUsed ? "opacity-50 bg-muted/20" : "bg-muted/30"
+                                }`}
+                                data-testid={`button-select-question-${q.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className={`font-medium truncate ${isRTL ? "font-arabic text-right" : ""}`}>
+                                    {language === "ar" ? q.textAr : q.textEn}
+                                  </p>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    <Badge variant="secondary" className="text-[9px]">{language === "ar" ? q.categoryAr : q.categoryEn}</Badge>
+                                    <Badge variant="outline" className="text-[9px]">{q.difficulty}</Badge>
+                                    {isUsed && <Badge variant="destructive" className="text-[9px]">{t("usedQuestions")}</Badge>}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -764,6 +944,292 @@ export default function Admin() {
               );
             })}
           </div>
+        </Card>
+
+        <Card className="p-4 space-y-4 lg:col-span-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <button
+              onClick={() => setQbExpanded(!qbExpanded)}
+              className="flex items-center gap-2"
+              data-testid="button-toggle-question-bank"
+            >
+              <h3
+                className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
+              >
+                <BookOpen className="h-4 w-4 text-amber-500" />
+                {t("questionBank")}
+                <Badge variant="secondary" className="text-[10px]">{allQuestions.length}</Badge>
+              </h3>
+              {qbExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {qbExpanded && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setQbShowForm(true);
+                  setQbEditingId(null);
+                  setQbForm({ textEn: "", textAr: "", optionAEn: "", optionAAr: "", optionBEn: "", optionBAr: "", optionCEn: "", optionCAr: "", optionDEn: "", optionDAr: "", correctAnswer: "a", categoryEn: "", categoryAr: "", difficulty: "medium" });
+                }}
+                data-testid="button-add-question"
+              >
+                <Plus className="h-3 w-3" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("addQuestion")}</span>
+              </Button>
+            )}
+          </div>
+
+          {qbExpanded && (
+            <div className="space-y-3">
+              {qbShowForm && (
+                <div className="space-y-3 p-3 rounded-md bg-muted/30" data-testid="form-question">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <Textarea placeholder={t("questionTextEn")} value={qbForm.textEn} onChange={(e) => setQbForm({ ...qbForm, textEn: e.target.value })} rows={2} data-testid="input-question-text-en" />
+                    <Textarea placeholder={t("questionTextAr")} value={qbForm.textAr} onChange={(e) => setQbForm({ ...qbForm, textAr: e.target.value })} rows={2} className="font-arabic" dir="rtl" data-testid="input-question-text-ar" />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <Input placeholder={`${t("optionA")} (EN)`} value={qbForm.optionAEn} onChange={(e) => setQbForm({ ...qbForm, optionAEn: e.target.value })} data-testid="input-option-a-en" />
+                    <Input placeholder={`${t("optionA")} (AR)`} value={qbForm.optionAAr} onChange={(e) => setQbForm({ ...qbForm, optionAAr: e.target.value })} className="font-arabic" dir="rtl" data-testid="input-option-a-ar" />
+                    <Input placeholder={`${t("optionB")} (EN)`} value={qbForm.optionBEn} onChange={(e) => setQbForm({ ...qbForm, optionBEn: e.target.value })} data-testid="input-option-b-en" />
+                    <Input placeholder={`${t("optionB")} (AR)`} value={qbForm.optionBAr} onChange={(e) => setQbForm({ ...qbForm, optionBAr: e.target.value })} className="font-arabic" dir="rtl" data-testid="input-option-b-ar" />
+                    <Input placeholder={`${t("optionC")} (EN)`} value={qbForm.optionCEn} onChange={(e) => setQbForm({ ...qbForm, optionCEn: e.target.value })} data-testid="input-option-c-en" />
+                    <Input placeholder={`${t("optionC")} (AR)`} value={qbForm.optionCAr} onChange={(e) => setQbForm({ ...qbForm, optionCAr: e.target.value })} className="font-arabic" dir="rtl" data-testid="input-option-c-ar" />
+                    <Input placeholder={`${t("optionD")} (EN)`} value={qbForm.optionDEn} onChange={(e) => setQbForm({ ...qbForm, optionDEn: e.target.value })} data-testid="input-option-d-en" />
+                    <Input placeholder={`${t("optionD")} (AR)`} value={qbForm.optionDAr} onChange={(e) => setQbForm({ ...qbForm, optionDAr: e.target.value })} className="font-arabic" dir="rtl" data-testid="input-option-d-ar" />
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Select value={qbForm.correctAnswer} onValueChange={(v) => setQbForm({ ...qbForm, correctAnswer: v })}>
+                      <SelectTrigger className="w-[120px]" data-testid="select-correct-answer">
+                        <SelectValue placeholder={t("correctAnswerSelect")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="a">A</SelectItem>
+                        <SelectItem value="b">B</SelectItem>
+                        <SelectItem value="c">C</SelectItem>
+                        <SelectItem value="d">D</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={qbForm.categoryEn || "none"}
+                      onValueChange={(v) => {
+                        if (v === "none") {
+                          setQbForm({ ...qbForm, categoryEn: "", categoryAr: "" });
+                        } else {
+                          const cat = (categoriesData || []).find((c: Category) => c.nameEn === v);
+                          setQbForm({ ...qbForm, categoryEn: v, categoryAr: cat?.nameAr || v });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="flex-1 min-w-[140px]" data-testid="select-question-category">
+                        <SelectValue placeholder={t("selectCategory")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t("selectCategory")}</SelectItem>
+                        {(categoriesData || []).map((cat: Category) => (
+                          <SelectItem key={cat.id} value={cat.nameEn}>{language === "ar" ? cat.nameAr : cat.nameEn}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={qbForm.difficulty} onValueChange={(v) => setQbForm({ ...qbForm, difficulty: v })}>
+                      <SelectTrigger className="w-[120px]" data-testid="select-question-difficulty">
+                        <SelectValue placeholder={t("selectDifficulty")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="easy">{t("easy")}</SelectItem>
+                        <SelectItem value="medium">{t("medium")}</SelectItem>
+                        <SelectItem value="hard">{t("hard")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (qbEditingId) {
+                          updateQuestionMutation.mutate({ id: qbEditingId, body: qbForm });
+                        } else {
+                          createQuestionMutation.mutate(qbForm);
+                        }
+                      }}
+                      disabled={createQuestionMutation.isPending || updateQuestionMutation.isPending || !qbForm.textEn || !qbForm.textAr}
+                      data-testid="button-save-question"
+                    >
+                      {(createQuestionMutation.isPending || updateQuestionMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      <span className={isRTL ? "font-arabic" : ""}>{qbEditingId ? t("updateQuestion") : t("saveQuestion")}</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setQbShowForm(false); setQbEditingId(null); }}
+                      data-testid="button-cancel-question"
+                    >
+                      <span className={isRTL ? "font-arabic" : ""}>{t("cancel")}</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[150px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder={t("searchQuestions")}
+                    value={qbSearch}
+                    onChange={(e) => setQbSearch(e.target.value)}
+                    className="ps-8 text-sm"
+                    data-testid="input-search-questions"
+                  />
+                </div>
+                <Select value={qbCategoryFilter} onValueChange={setQbCategoryFilter}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-qb-category">
+                    <SelectValue placeholder={t("filterByCategory")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("allCategories")}</SelectItem>
+                    {(categoriesData || []).map((cat: Category) => (
+                      <SelectItem key={cat.id} value={cat.nameEn}>{language === "ar" ? cat.nameAr : cat.nameEn}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={qbDifficultyFilter} onValueChange={setQbDifficultyFilter}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-qb-difficulty">
+                    <SelectValue placeholder={t("filterByDifficulty")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("allDifficulties")}</SelectItem>
+                    <SelectItem value="easy">{t("easy")}</SelectItem>
+                    <SelectItem value="medium">{t("medium")}</SelectItem>
+                    <SelectItem value="hard">{t("hard")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {allQuestions
+                  .filter((q: Question) => {
+                    const search = qbSearch.toLowerCase();
+                    if (search && !q.textEn.toLowerCase().includes(search) && !q.textAr.includes(qbSearch)) return false;
+                    if (qbCategoryFilter !== "all" && q.categoryEn !== qbCategoryFilter) return false;
+                    if (qbDifficultyFilter !== "all" && q.difficulty !== qbDifficultyFilter) return false;
+                    return true;
+                  })
+                  .map((q: Question) => (
+                    <div
+                      key={q.id}
+                      className="flex items-start gap-2 p-2.5 rounded-md bg-muted/30"
+                      data-testid={`row-question-${q.id}`}
+                    >
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className={`text-sm font-medium ${isRTL ? "font-arabic text-right" : ""}`}>
+                          {language === "ar" ? q.textAr : q.textEn}
+                        </p>
+                        <p className={`text-xs text-muted-foreground ${isRTL ? "" : ""}`} dir={language === "ar" ? "ltr" : "rtl"}>
+                          {language === "ar" ? q.textEn : q.textAr}
+                        </p>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="secondary" className="text-[9px]">{language === "ar" ? q.categoryAr : q.categoryEn}</Badge>
+                          <Badge variant="outline" className="text-[9px]">{q.difficulty}</Badge>
+                          <Badge variant="default" className="text-[9px] bg-emerald-600">{t("correctAnswerLabel")}: {q.correctAnswer.toUpperCase()}</Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setQbEditingId(q.id);
+                            setQbShowForm(true);
+                            setQbForm({
+                              textEn: q.textEn, textAr: q.textAr,
+                              optionAEn: q.optionAEn, optionAAr: q.optionAAr,
+                              optionBEn: q.optionBEn, optionBAr: q.optionBAr,
+                              optionCEn: q.optionCEn, optionCAr: q.optionCAr,
+                              optionDEn: q.optionDEn, optionDAr: q.optionDAr,
+                              correctAnswer: q.correctAnswer,
+                              categoryEn: q.categoryEn, categoryAr: q.categoryAr,
+                              difficulty: q.difficulty,
+                            });
+                          }}
+                          data-testid={`button-edit-question-${q.id}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(t("confirmDelete"))) {
+                              deleteQuestionMutation.mutate(q.id);
+                            }
+                          }}
+                          data-testid={`button-delete-question-${q.id}`}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                {allQuestions.filter((q: Question) => {
+                  const search = qbSearch.toLowerCase();
+                  if (search && !q.textEn.toLowerCase().includes(search) && !q.textAr.includes(qbSearch)) return false;
+                  if (qbCategoryFilter !== "all" && q.categoryEn !== qbCategoryFilter) return false;
+                  if (qbDifficultyFilter !== "all" && q.difficulty !== qbDifficultyFilter) return false;
+                  return true;
+                }).length === 0 && (
+                  <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>{t("noQuestionsFound")}</p>
+                )}
+              </div>
+
+              <div className="border-t pt-3">
+                <button
+                  onClick={() => setShowCatManager(!showCatManager)}
+                  className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                  data-testid="button-toggle-category-manager"
+                >
+                  {showCatManager ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  {t("manageCategories")}
+                </button>
+                {showCatManager && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <Input placeholder={t("categoryNameEn")} value={catFormNameEn} onChange={(e) => setCatFormNameEn(e.target.value)} className="flex-1 min-w-[120px]" data-testid="input-category-name-en" />
+                      <Input placeholder={t("categoryNameAr")} value={catFormNameAr} onChange={(e) => setCatFormNameAr(e.target.value)} className="flex-1 min-w-[120px] font-arabic" dir="rtl" data-testid="input-category-name-ar" />
+                      <Input type="color" value={catFormColor} onChange={(e) => setCatFormColor(e.target.value)} className="w-12" data-testid="input-category-color" />
+                      <Button
+                        size="sm"
+                        onClick={() => createCategoryMutation.mutate()}
+                        disabled={createCategoryMutation.isPending || !catFormNameEn || !catFormNameAr}
+                        data-testid="button-add-category"
+                      >
+                        {createCategoryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        <span className={isRTL ? "font-arabic" : ""}>{t("addCategory")}</span>
+                      </Button>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {(categoriesData || []).map((cat: Category) => (
+                        <div key={cat.id} className="flex items-center gap-1 p-1.5 rounded-md bg-muted/30">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                          <span className="text-xs">{language === "ar" ? cat.nameAr : cat.nameEn}</span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => {
+                              if (window.confirm(t("confirmDelete"))) {
+                                deleteCategoryMutation.mutate(cat.id);
+                              }
+                            }}
+                            data-testid={`button-delete-category-${cat.id}`}
+                          >
+                            <Trash2 className="h-2.5 w-2.5 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="p-4 space-y-4 lg:col-span-2">

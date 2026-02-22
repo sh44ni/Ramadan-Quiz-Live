@@ -135,6 +135,7 @@ export function useGameSocket() {
   const adminSetTeam = useCallback((teamId: number) => send({ type: "admin-set-team", teamId }), [send]);
   const adminAdjustScore = useCallback((teamId: number, points: number) => send({ type: "admin-adjust-score", teamId, points }), [send]);
   const adminNextQuestion = useCallback(() => send({ type: "admin-next-question" }), [send]);
+  const adminSelectSpecificQuestion = useCallback((questionId: number) => send({ type: "admin-select-specific-question", questionId }), [send]);
   const adminStartTimer = useCallback(() => send({ type: "admin-start-timer" }), [send]);
   const adminShowAnswer = useCallback(() => send({ type: "admin-show-answer" }), [send]);
   const adminResetTimer = useCallback(() => send({ type: "admin-reset-timer" }), [send]);
@@ -156,6 +157,7 @@ export function useGameSocket() {
     adminSetTeam,
     adminAdjustScore,
     adminNextQuestion,
+    adminSelectSpecificQuestion,
     adminStartTimer,
     adminShowAnswer,
     adminResetTimer,

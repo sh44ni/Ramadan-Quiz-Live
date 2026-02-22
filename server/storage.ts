@@ -2,8 +2,9 @@ import { db } from "./db";
 import { eq, and, lt } from "drizzle-orm";
 import {
   teams, questions, gameSessions, teamScores, questionHistory,
-  authorizedEmails, otpCodes,
+  authorizedEmails, otpCodes, categories,
   type Team, type InsertTeam,
+  type Category, type InsertCategory,
   type Question, type InsertQuestion,
   type GameSession, type InsertGameSession,
   type TeamScore, type InsertTeamScore,
@@ -17,9 +18,17 @@ export interface IStorage {
   getTeam(id: number): Promise<Team | undefined>;
   createTeam(team: InsertTeam): Promise<Team>;
 
+  getCategories(): Promise<Category[]>;
+  getCategory(id: number): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: number, data: Partial<Category>): Promise<Category | undefined>;
+  deleteCategory(id: number): Promise<void>;
+
   getQuestions(): Promise<Question[]>;
   getQuestion(id: number): Promise<Question | undefined>;
   createQuestion(question: InsertQuestion): Promise<Question>;
+  updateQuestion(id: number, data: Partial<Question>): Promise<Question | undefined>;
+  deleteQuestion(id: number): Promise<void>;
 
   getActiveSession(): Promise<GameSession | undefined>;
   getSession(id: number): Promise<GameSession | undefined>;
@@ -61,6 +70,29 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getCategories(): Promise<Category[]> {
+    return db.select().from(categories);
+  }
+
+  async getCategory(id: number): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [created] = await db.insert(categories).values(category).returning();
+    return created;
+  }
+
+  async updateCategory(id: number, data: Partial<Category>): Promise<Category | undefined> {
+    const [updated] = await db.update(categories).set(data).where(eq(categories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCategory(id: number): Promise<void> {
+    await db.delete(categories).where(eq(categories.id, id));
+  }
+
   async getQuestions(): Promise<Question[]> {
     return db.select().from(questions);
   }
@@ -73,6 +105,15 @@ export class DatabaseStorage implements IStorage {
   async createQuestion(question: InsertQuestion): Promise<Question> {
     const [created] = await db.insert(questions).values(question).returning();
     return created;
+  }
+
+  async updateQuestion(id: number, data: Partial<Question>): Promise<Question | undefined> {
+    const [updated] = await db.update(questions).set(data).where(eq(questions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteQuestion(id: number): Promise<void> {
+    await db.delete(questions).where(eq(questions.id, id));
   }
 
   async getActiveSession(): Promise<GameSession | undefined> {

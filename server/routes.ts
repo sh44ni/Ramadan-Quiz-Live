@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
+import { insertCategorySchema, insertQuestionSchema } from "@shared/schema";
 
 const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
 const adminTokens = new Set<string>();
@@ -334,6 +335,77 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to reset game" });
+    }
+  });
+
+  app.get("/api/categories", async (_req, res) => {
+    try {
+      const cats = await storage.getCategories();
+      res.json(cats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/categories", requireAdmin, async (req, res) => {
+    try {
+      const result = insertCategorySchema.safeParse(req.body);
+      if (!result.success) return res.status(400).json({ message: "Invalid category data", errors: result.error.flatten() });
+      const created = await storage.createCategory(result.data);
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.put("/api/categories/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const updated = await storage.updateCategory(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/categories/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      await storage.deleteCategory(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  app.post("/api/questions", requireAdmin, async (req, res) => {
+    try {
+      const result = insertQuestionSchema.safeParse(req.body);
+      if (!result.success) return res.status(400).json({ message: "Invalid question data", errors: result.error.flatten() });
+      const created = await storage.createQuestion(result.data);
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create question" });
+    }
+  });
+
+  app.put("/api/questions/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const updated = await storage.updateQuestion(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update question" });
+    }
+  });
+
+  app.delete("/api/questions/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      await storage.deleteQuestion(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete question" });
     }
   });
 
