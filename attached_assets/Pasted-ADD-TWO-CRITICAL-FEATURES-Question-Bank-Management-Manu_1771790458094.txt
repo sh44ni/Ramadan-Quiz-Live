@@ -1,0 +1,51 @@
+ADD TWO CRITICAL FEATURES: Question Bank Management + Manual Question Selection
+
+**1. QUESTION BANK SYSTEM:**
+
+**Admin Panel - Question Management:**
+- "Question Bank" section in admin panel
+- Add new questions with:
+  * Question text (Arabic + English)
+  * 4 answer options (Arabic + English)  
+  * Correct answer selection
+  * Category dropdown (Religion, Omani Culture, General Knowledge, History, etc.)
+  * Difficulty level (Easy, Medium, Hard)
+- Edit existing questions
+- Delete questions with confirmation
+- Search/filter questions by category or keyword
+- Import/export question sets
+- Question preview before adding to game
+
+**Database Schema Addition:**
+```sql
+Categories: id, name_en, name_ar, color
+Questions: id, text_en, text_ar, option_a_en, option_a_ar, option_b_en, option_b_ar, option_c_en, option_c_ar, option_d_en, option_d_ar, correct_answer, category_id, difficulty, is_active
+```
+
+**2. MANUAL QUESTION SELECTION:**
+
+**Replace Sequential Question Flow:**
+- Admin sees list of all available questions during game
+- Admin manually selects which specific question each team will answer
+- Questions can be filtered by category/difficulty
+- Used questions get marked/grayed out (but can be reused if needed)
+- Admin has full control over question order and selection
+
+**Updated Game Flow:**
+Step 1: Admin selects active team
+Step 2: Admin chooses specific question from question bank
+Step 3: Question displays on all screens
+Step 4: Admin starts timer manually
+Step 5: Team answers
+Step 6: Result display (4 seconds)
+Step 7: Score updates
+Step 8: Admin selects next question for same team or different team
+
+**Admin Controls During Game:**
+- Question selection dropdown/list (categorized)
+- "Assign Question to Team X" button
+- Mark questions as used/unused
+- Quick category filters (Religion, Culture, etc.)
+- Question preview before assigning
+
+This gives admin complete control over both question content and which team gets which question.
