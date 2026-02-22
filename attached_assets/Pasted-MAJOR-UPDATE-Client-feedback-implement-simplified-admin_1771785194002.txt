@@ -1,0 +1,68 @@
+MAJOR UPDATE: Client feedback - implement simplified admin-controlled workflow.
+
+**CLIENT REQUIREMENTS:**
+The client is very happy with the current system but wants these specific changes for better control and flow:
+
+**1. REMOVE TEAM SELECTION - ADMIN CONTROLS EVERYTHING:**
+- Teams can no longer select questions themselves
+- Only admin can advance the game
+- Remove the question grid interface for teams
+- Teams become passive participants who only view and answer
+
+**2. SEQUENTIAL QUESTION FLOW:**
+- Show 5 consecutive questions for each team in order
+- Team 1: Questions 1-5, Team 2: Questions 6-10, Team 3: Questions 11-15, etc.
+- After team completes their 5 questions, automatically move to next team
+- No more random question selection
+
+**3. ADMIN MANUAL TIMER CONTROL:**
+- Admin clicks "Start Timer" button to begin 30-second countdown for each question
+- Timer does not auto-start when question appears
+- Admin has full control over when timing begins
+- Add "Reset Timer" and "Skip Question" options for admin
+
+**4. ENHANCED ANSWER FEEDBACK DISPLAY:**
+- After answer submission, show LARGE, CLEAR correct/wrong indication
+- Display for 3-5 seconds (not quick flash)
+- Use big green checkmark ✓ for correct, red X ✗ for wrong
+- Show correct answer clearly if team got it wrong
+- Make sure audience can easily see the result
+
+**5. SIMPLIFIED SCORING:**
+- 1 point per correct answer (no complex scoring)
+- Update live scoreboard immediately after each answer
+- Show running totals clearly
+
+**6. UPDATED GAME FLOW:**
+Step 1: Admin selects which team is active
+Step 2: Admin displays question (no timer yet)  
+Step 3: Admin manually starts 30-second timer
+Step 4: Team submits answer from their device
+Step 5: Large correct/wrong display for 3-5 seconds
+Step 6: Score updates
+Step 7: Admin advances to next question or next team
+
+**7. ADMIN PANEL CONTROLS:**
+- "Next Question" button
+- "Start Timer" button  
+- "Next Team" button
+- Manual score adjustments
+- "Show Answer" button (reveal correct answer)
+- Game reset/restart options
+
+**8. TEAM INTERFACE SIMPLIFICATION:**
+- Teams only see: current question, answer options, submit button
+- No question selection grid
+- No timer controls
+- Just answer submission interface
+
+**9. DISPLAY SCREEN UPDATES:**
+- Show current team clearly
+- Display question with large, readable text
+- Big timer countdown
+- Enhanced correct/wrong feedback animations
+- Updated scoreboard after each question
+
+**IMPORTANT:** Keep all existing Arabic/English language support, team names, and visual design. Just modify the control flow and feedback systems.
+
+The client will send updated questions soon - prepare the system to easily replace the current question set.
