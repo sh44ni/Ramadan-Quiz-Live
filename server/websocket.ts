@@ -34,6 +34,7 @@ let wss: WebSocketServer;
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 let currentTimerSeconds = 30;
 let timerRunning = false;
+let teamAdvanceInProgress = false;
 
 function broadcast(data: any) {
   if (!wss) return;
@@ -72,12 +73,75 @@ function stopTimer() {
   timerRunning = false;
 }
 
+const QUESTIONS_PER_TEAM = 5;
+
+async function getTeamQuestionCount(sessionId: number, teamId: number): Promise<number> {
+  const history = await storage.getQuestionHistory(sessionId);
+  return history.filter((h) => h.teamId === teamId).length;
+}
+
 async function getNextSequentialQuestion(sessionId: number): Promise<any | null> {
+  const session = await storage.getActiveSession();
+  if (!session) return null;
+
+  const teams = await storage.getTeams();
+  const currentTeamIndex = teams.findIndex((t) => t.id === session.currentTeamId);
+  if (currentTeamIndex === -1) return null;
+
   const answeredIds = await storage.getAnsweredQuestionIds(sessionId);
   const allQuestions = await storage.getQuestions();
-  const unanswered = allQuestions.filter((q) => !answeredIds.includes(q.id));
-  if (unanswered.length === 0) return null;
-  return unanswered[0];
+
+  const startIdx = currentTeamIndex * QUESTIONS_PER_TEAM;
+  const endIdx = startIdx + QUESTIONS_PER_TEAM;
+  const teamQuestions = allQuestions.slice(startIdx, endIdx);
+
+  const unansweredTeamQ = teamQuestions.filter((q) => !answeredIds.includes(q.id));
+  if (unansweredTeamQ.length > 0) return unansweredTeamQ[0];
+
+  const allUnanswered = allQuestions.filter((q) => !answeredIds.includes(q.id));
+  if (allUnanswered.length === 0) return null;
+  return allUnanswered[0];
+}
+
+async function checkTeamCompletionAndAdvance(sessionId: number, teamId: number): Promise<boolean> {
+  if (teamAdvanceInProgress) return false;
+
+  const count = await getTeamQuestionCount(sessionId, teamId);
+  if (count >= QUESTIONS_PER_TEAM) {
+    teamAdvanceInProgress = true;
+
+    const session = await storage.getActiveSession();
+    if (!session) { teamAdvanceInProgress = false; return true; }
+
+    const teams = await storage.getTeams();
+    const currentIndex = teams.findIndex((t) => t.id === teamId);
+    const nextTeam = teams[(currentIndex + 1) % teams.length];
+
+    const answeredIds = await storage.getAnsweredQuestionIds(sessionId);
+    const allQuestions = await storage.getQuestions();
+
+    const totalExpected = teams.length * QUESTIONS_PER_TEAM;
+    if (answeredIds.length >= totalExpected || answeredIds.length >= allQuestions.length) {
+      await storage.updateSession(sessionId, { status: "finished", currentQuestionId: null });
+      broadcast({ type: "game-finished" });
+    } else {
+      await storage.updateSession(sessionId, {
+        currentTeamId: nextTeam.id,
+        currentQuestionId: null,
+      });
+      broadcast({
+        type: "team-completed",
+        completedTeamId: teamId,
+        nextTeamId: nextTeam.id,
+      });
+      broadcast({ type: "turn-changed", teamId: nextTeam.id });
+    }
+
+    await broadcastGameState();
+    teamAdvanceInProgress = false;
+    return true;
+  }
+  return false;
 }
 
 async function handleTimeUp() {
@@ -91,15 +155,18 @@ async function handleTimeUp() {
     const question = await storage.getQuestion(session.currentQuestionId);
     if (!question) return;
 
+    const teamId = session.currentTeamId!;
+    const sessionId = session.id;
+
     await storage.createQuestionHistory({
-      sessionId: session.id,
-      teamId: session.currentTeamId!,
+      sessionId,
+      teamId,
       questionId: session.currentQuestionId,
       answerGiven: "",
       isCorrect: false,
     });
 
-    const teamScore = await storage.getTeamScore(session.id, session.currentTeamId!);
+    const teamScore = await storage.getTeamScore(sessionId, teamId);
     if (teamScore) {
       await storage.updateTeamScore(teamScore.id, {
         questionsAnswered: teamScore.questionsAnswered + 1,
@@ -111,10 +178,15 @@ async function handleTimeUp() {
       isCorrect: false,
       correctAnswer: question.correctAnswer,
       answerGiven: "",
-      teamId: session.currentTeamId!,
+      teamId,
     });
 
-    setTimeout(() => broadcastGameState(), 4000);
+    setTimeout(async () => {
+      const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);
+      if (!advanced) {
+        await broadcastGameState();
+      }
+    }, 4000);
   } catch (error) {
     log(`Error handling time-up: ${error}`, "ws");
   }
@@ -222,6 +294,13 @@ async function handleMessage(ws: WebSocket, raw: string) {
         if (!session) return;
         stopTimer();
 
+        const currentTeamId = session.currentTeamId!;
+        const teamQCount = await getTeamQuestionCount(session.id, currentTeamId);
+        if (teamQCount >= QUESTIONS_PER_TEAM) {
+          const advanced = await checkTeamCompletionAndAdvance(session.id, currentTeamId);
+          if (advanced) return;
+        }
+
         const nextQ = await getNextSequentialQuestion(session.id);
         if (!nextQ) {
           await storage.updateSession(session.id, { status: "finished", currentQuestionId: null });
@@ -263,15 +342,18 @@ async function handleMessage(ws: WebSocket, raw: string) {
         const question = await storage.getQuestion(session.currentQuestionId);
         if (!question) return;
 
+        const showTeamId = session.currentTeamId!;
+        const showSessionId = session.id;
+
         await storage.createQuestionHistory({
-          sessionId: session.id,
-          teamId: session.currentTeamId!,
+          sessionId: showSessionId,
+          teamId: showTeamId,
           questionId: session.currentQuestionId,
           answerGiven: "",
           isCorrect: false,
         });
 
-        const teamScore = await storage.getTeamScore(session.id, session.currentTeamId!);
+        const teamScore = await storage.getTeamScore(showSessionId, showTeamId);
         if (teamScore) {
           await storage.updateTeamScore(teamScore.id, {
             questionsAnswered: teamScore.questionsAnswered + 1,
@@ -283,10 +365,15 @@ async function handleMessage(ws: WebSocket, raw: string) {
           isCorrect: false,
           correctAnswer: question.correctAnswer,
           answerGiven: "",
-          teamId: session.currentTeamId!,
+          teamId: showTeamId,
         });
 
-        setTimeout(() => broadcastGameState(), 4000);
+        setTimeout(async () => {
+          const advanced = await checkTeamCompletionAndAdvance(showSessionId, showTeamId);
+          if (!advanced) {
+            await broadcastGameState();
+          }
+        }, 4000);
         break;
       }
 
@@ -327,7 +414,12 @@ async function handleMessage(ws: WebSocket, raw: string) {
           teamId,
         });
 
-        setTimeout(() => broadcastGameState(), 4000);
+        setTimeout(async () => {
+          const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);
+          if (!advanced) {
+            await broadcastGameState();
+          }
+        }, 4000);
         break;
       }
 

@@ -23,7 +23,7 @@ import {
 export default function Display() {
   const { t } = useTranslation();
   const { isRTL, language } = useLanguage();
-  const { gameState, timer, answerResult, connected } = useGameSocket();
+  const { gameState, timer, answerResult, teamCompleted, connected } = useGameSocket();
 
   const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
   const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
@@ -403,16 +403,54 @@ export default function Display() {
                   exit={{ opacity: 0 }}
                   className="flex-1 flex flex-col items-center justify-center gap-6"
                 >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Sparkles className="h-16 w-16 text-amber-400/50" />
-                  </motion.div>
-                  <p className={`text-2xl text-white/60 font-medium ${isRTL ? "font-arabic" : ""}`} data-testid="display-waiting-selection">
-                    {t("waitingForAdmin") || "Waiting for the next question..."}
-                  </p>
-                  {currentTeam && (
+                  {teamCompleted ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-blue-500/20 border-2 border-blue-400/30"
+                      data-testid="display-team-completed"
+                    >
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ duration: 0.5, repeat: 3 }}
+                      >
+                        <CheckCircle2 className="h-16 w-16 text-blue-400" />
+                      </motion.div>
+                      <p className={`text-3xl text-white font-bold text-center ${isRTL ? "font-arabic" : ""}`}>
+                        {teams.find(t => t.id === teamCompleted.completedTeamId)
+                          ? language === "ar"
+                            ? teams.find(t => t.id === teamCompleted.completedTeamId)!.nameAr
+                            : teams.find(t => t.id === teamCompleted.completedTeamId)!.nameEn
+                          : ""}{" "}
+                        {t("teamCompletedMoving")}
+                      </p>
+                      <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/15">
+                        <div className="w-5 h-5 rounded-full" style={{
+                          backgroundColor: teams.find(t => t.id === teamCompleted.nextTeamId)?.color
+                        }} />
+                        <span className={`text-2xl text-white font-bold ${isRTL ? "font-arabic" : ""}`}>
+                          {teams.find(t => t.id === teamCompleted.nextTeamId)
+                            ? language === "ar"
+                              ? teams.find(t => t.id === teamCompleted.nextTeamId)!.nameAr
+                              : teams.find(t => t.id === teamCompleted.nextTeamId)!.nameEn
+                            : ""}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <>
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <Sparkles className="h-16 w-16 text-amber-400/50" />
+                      </motion.div>
+                      <p className={`text-2xl text-white/60 font-medium ${isRTL ? "font-arabic" : ""}`} data-testid="display-waiting-selection">
+                        {t("waitingForAdmin") || "Waiting for the next question..."}
+                      </p>
+                    </>
+                  )}
+                  {currentTeam && !teamCompleted && (
                     <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10">
                       <div className="w-4 h-4 rounded-full" style={{ backgroundColor: currentTeam.color }} />
                       <span className={`text-lg text-white font-medium ${isRTL ? "font-arabic" : ""}`}>

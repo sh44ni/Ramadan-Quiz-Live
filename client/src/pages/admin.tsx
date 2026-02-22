@@ -74,6 +74,7 @@ export default function Admin() {
     gameState: wsGameState,
     timer: wsTimer,
     answerResult: wsAnswerResult,
+    teamCompleted: wsTeamCompleted,
     connected: wsConnected,
     adminStart,
     adminPause,
@@ -386,6 +387,10 @@ export default function Admin() {
     ? allQuestions.findIndex((q: any) => q.id === currentQuestion.id) + 1
     : 0;
 
+  const currentTeamQuestionsAnswered = session && currentTeam
+    ? scores.find((s: TeamScore) => s.teamId === currentTeam.id)?.questionsAnswered || 0
+    : 0;
+
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -571,8 +576,24 @@ export default function Admin() {
                 <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
                   {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
                 </span>
-                <Badge variant="secondary" className="text-xs ms-auto">{t("currentTeam")}</Badge>
+                <Badge variant="secondary" className="text-xs ms-auto">
+                  {currentTeamQuestionsAnswered}/5 {t("questions")}
+                </Badge>
               </div>
+            )}
+
+            {wsTeamCompleted && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 p-3 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 font-medium text-sm"
+                data-testid="notification-team-completed"
+              >
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span className={isRTL ? "font-arabic" : ""}>
+                  {getTeamName(wsTeamCompleted.completedTeamId)} {t("teamCompletedMoving") || "completed!"} → {getTeamName(wsTeamCompleted.nextTeamId)}
+                </span>
+              </motion.div>
             )}
 
             {currentQuestion ? (
@@ -650,7 +671,7 @@ export default function Admin() {
                 </div>
                 <Button
                   onClick={() => adminNextQuestion()}
-                  disabled={!nextUnansweredQuestion}
+                  disabled={!nextUnansweredQuestion || !!wsTeamCompleted}
                   className="w-full gold-gradient border-amber-400/30 text-white font-bold"
                   data-testid="button-next-question"
                 >

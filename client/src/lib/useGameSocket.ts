@@ -23,6 +23,11 @@ interface AnswerResult {
   teamId: number;
 }
 
+interface TeamCompletedEvent {
+  completedTeamId: number;
+  nextTeamId: number;
+}
+
 export function useGameSocket() {
   const [gameState, setGameState] = useState<GameState>({
     session: null,
@@ -35,6 +40,7 @@ export function useGameSocket() {
   });
   const [timer, setTimer] = useState<TimerState>({ seconds: 30, running: false });
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
+  const [teamCompleted, setTeamCompleted] = useState<TeamCompletedEvent | null>(null);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,6 +74,10 @@ export function useGameSocket() {
           case "question-selected":
             break;
           case "turn-changed":
+            break;
+          case "team-completed":
+            setTeamCompleted({ completedTeamId: msg.completedTeamId, nextTeamId: msg.nextTeamId });
+            setTimeout(() => setTeamCompleted(null), 5000);
             break;
           case "game-started":
           case "game-paused":
@@ -133,6 +143,7 @@ export function useGameSocket() {
     gameState,
     timer,
     answerResult,
+    teamCompleted,
     connected,
     selectQuestion,
     submitAnswer,

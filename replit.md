@@ -165,9 +165,10 @@ The app is designed for a live event with two types of screens:
 7. Admin clicks "Start Timer" to begin the 30-second countdown
 8. Team submits answer OR timer expires (server auto-handles time-up)
 9. Result shown: correct (+1 point) or incorrect (0 points), correct answer revealed with 4-second feedback animation
-10. Admin clicks "Next Question" to continue, auto-rotates to next team after each team's set of questions
-11. Game ends when all 36 questions answered or admin ends manually
-12. Final results shown on `/results` page with rankings
+10. **Auto team progression**: After a team completes 5 questions, system automatically switches to the next team with a "Team X completed, moving to Team Y" notification
+11. Admin clicks "Next Question" to continue with the next team
+12. Game ends when all 30 questions answered (5 per team × 6 teams) or admin ends manually
+13. Final results shown on `/results` page with rankings
 
 ## Player Authentication (OTP)
 - Players access `/login` to authenticate

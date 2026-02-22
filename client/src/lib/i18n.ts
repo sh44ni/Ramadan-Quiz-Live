@@ -212,6 +212,8 @@ const resources = {
       adminWillSelectQuestion: "The admin will select the next question",
       waitingForTimer: "Waiting for timer to start",
       waitingForAdmin: "Waiting for the next question...",
+      teamCompletedMoving: "completed! Moving to",
+      teamProgress: "Questions",
     },
   },
   ar: {
@@ -424,6 +426,8 @@ const resources = {
       adminWillSelectQuestion: "المشرف سيختار السؤال التالي",
       waitingForTimer: "في انتظار بدء المؤقت",
       waitingForAdmin: "في انتظار السؤال التالي...",
+      teamCompletedMoving: "أكملوا أسئلتهم! الانتقال إلى",
+      teamProgress: "أسئلة",
     },
   },
 };
