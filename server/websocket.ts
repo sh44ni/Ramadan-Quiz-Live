@@ -174,6 +174,8 @@ async function handleTimeUp() {
       });
     }
 
+    await storage.updateSession(sessionId, { currentQuestionId: null });
+
     broadcast({
       type: "answer-result",
       isCorrect: false,
@@ -181,6 +183,8 @@ async function handleTimeUp() {
       answerGiven: "",
       teamId,
     });
+
+    await broadcastGameState();
 
     setTimeout(async () => {
       const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);
@@ -423,6 +427,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
           });
         }
 
+        await storage.updateSession(sessionId, { currentQuestionId: null });
+
         broadcast({
           type: "answer-result",
           isCorrect,
@@ -430,6 +436,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
           answerGiven: answer,
           teamId,
         });
+
+        await broadcastGameState();
 
         setTimeout(async () => {
           const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);

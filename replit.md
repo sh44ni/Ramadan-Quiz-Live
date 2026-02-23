@@ -109,7 +109,12 @@ The app is designed for a live event with two types of screens:
 ### Client Hook (`client/src/lib/useGameSocket.ts`)
 - `useGameSocket()` hook manages all real-time state
 - Auto-connects with reconnection on disconnect (2-second retry)
+- All event types handled with immediate state updates (question-selected, turn-changed, game status changes, time-up, game-reset)
 - Returns: `gameState`, `timer`, `answerResult`, `connected`, plus action functions
+
+### Broadcast Consistency
+- Both WebSocket `submit-answer` handler AND HTTP `POST /api/game/answer` route broadcast `answer-result` and `broadcastGameState()` to all WebSocket clients
+- `currentQuestionId` is cleared immediately after answer submission (WebSocket, HTTP, and time-up handlers) to prevent stale question display on audience screen
 
 ### WebSocket Events
 | Event | Direction | Description |

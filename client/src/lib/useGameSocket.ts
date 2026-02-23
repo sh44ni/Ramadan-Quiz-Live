@@ -72,19 +72,61 @@ export function useGameSocket() {
             setTimeout(() => setAnswerResult(null), 4000);
             break;
           case "question-selected":
+            if (msg.question) {
+              setGameState((prev) => ({ ...prev, currentQuestion: msg.question }));
+            }
             break;
           case "turn-changed":
+            if (msg.teamId) {
+              setGameState((prev) => ({
+                ...prev,
+                session: prev.session ? { ...prev.session, currentTeamId: msg.teamId } : prev.session,
+                currentQuestion: null,
+              }));
+            }
             break;
           case "team-completed":
             setTeamCompleted({ completedTeamId: msg.completedTeamId, nextTeamId: msg.nextTeamId });
             setTimeout(() => setTeamCompleted(null), 5000);
             break;
           case "game-started":
+            setGameState((prev) => ({
+              ...prev,
+              session: prev.session ? { ...prev.session, status: "active" } : prev.session,
+            }));
+            break;
           case "game-paused":
+            setGameState((prev) => ({
+              ...prev,
+              session: prev.session ? { ...prev.session, status: "paused" } : prev.session,
+            }));
+            break;
           case "game-resumed":
+            setGameState((prev) => ({
+              ...prev,
+              session: prev.session ? { ...prev.session, status: "active" } : prev.session,
+            }));
+            break;
           case "game-finished":
+            setGameState((prev) => ({
+              ...prev,
+              session: prev.session ? { ...prev.session, status: "finished" } : prev.session,
+              currentQuestion: null,
+            }));
+            break;
           case "game-reset":
+            setGameState((prev) => ({
+              ...prev,
+              session: null,
+              scores: [],
+              answeredQuestionIds: [],
+              currentQuestion: null,
+            }));
+            setAnswerResult(null);
+            setTeamCompleted(null);
+            break;
           case "time-up":
+            setTimer({ seconds: 0, running: false });
             break;
         }
       } catch (e) {

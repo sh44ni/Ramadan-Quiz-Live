@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
 import { insertCategorySchema, insertQuestionSchema } from "@shared/schema";
+import { broadcast, broadcastGameState, stopTimer } from "./websocket";
 
 const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
 const adminTokens = new Set<string>();
@@ -459,6 +460,18 @@ export async function registerRoutes(
       if (answeredIds.length >= allQuestions.length) {
         await storage.updateSession(sessionId, { status: "finished" });
       }
+
+      stopTimer();
+
+      broadcast({
+        type: "answer-result",
+        isCorrect,
+        correctAnswer: question.correctAnswer,
+        answerGiven: answer,
+        teamId,
+      });
+
+      await broadcastGameState();
 
       res.json({ isCorrect, correctAnswer: question.correctAnswer });
     } catch (error) {
