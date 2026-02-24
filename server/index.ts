@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
+import path from "path";
+import fs from "fs";
 
 const app = express();
 const httpServer = createServer(app);
@@ -40,7 +42,7 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const reqPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -51,8 +53,8 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -63,6 +65,14 @@ app.use((req, res, next) => {
 
   next();
 });
+
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.resolve(__dirname, "public");
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    log("static assets served from " + distPath, "static");
+  }
+}
 
 const port = parseInt(process.env.PORT || "5000", 10);
 httpServer.listen(
@@ -77,7 +87,13 @@ httpServer.listen(
 );
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  try {
+    await registerRoutes(httpServer, app);
+    log("routes registered and database seeded");
+  } catch (e) {
+    console.error("Failed to register routes/seed database:", e);
+  }
+
   setupWebSocket(httpServer);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -93,11 +109,14 @@ httpServer.listen(
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
+    const distPath = path.resolve(__dirname, "public");
+    if (fs.existsSync(distPath)) {
+      app.use("/{*path}", (_req, res) => {
+        res.sendFile(path.resolve(distPath, "index.html"));
+      });
+      log("SPA fallback route configured", "static");
+    }
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
