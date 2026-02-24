@@ -81,8 +81,7 @@ export default function Display() {
           <img
             src="/images/ramadan-banner.jpeg"
             alt="Ramadan Competition Banner"
-            className="w-full h-auto object-cover"
-            style={{ maxHeight: "45vh" }}
+            className="w-full h-auto"
           />
         </div>
 
@@ -126,8 +125,7 @@ export default function Display() {
           <img
             src="/images/ramadan-banner.jpeg"
             alt="Ramadan Competition Banner"
-            className="w-full h-auto object-cover"
-            style={{ maxHeight: "30vh" }}
+            className="w-full h-auto"
           />
         </div>
 
@@ -214,8 +212,7 @@ export default function Display() {
         <img
           src="/images/ramadan-banner.jpeg"
           alt="Ramadan Competition Banner"
-          className="w-full h-auto object-cover"
-          style={{ maxHeight: "20vh" }}
+          className="w-full h-auto"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#122a4f]" />
       </div>
