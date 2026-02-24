@@ -1,0 +1,70 @@
+FINAL RAMADAN QUIZ SYSTEM - Complete Implementation
+
+**GAME FLOW SPECIFICATION:**
+
+**Phase 1: Game Setup**
+- Admin prepares 31 questions total for the competition
+- System automatically assigns 6 question numbers to each player
+- Admin clicks "Start Game" to begin
+- Initialize question assignments and availability tracking
+
+**Phase 2: Entry Phase (1 Minute)**
+- All 6 teams allowed to join during 1-minute window
+- Display countdown timer for entry period
+- Automatically close entry after 1 minute expires
+- Show "Entry Closed" message after deadline
+
+**Phase 3: Turn Management System**
+- Sequential team rotation (Team 1 → Team 2 → Team 3 → etc.)
+- Within each team: one player answers at a time, then next player
+- Non-active teams see "Waiting for your turn" screen
+- Clear indication of which team/player is currently active
+
+**Phase 4: Question Selection (1 Minute)**
+- Active player sees only their assigned 6 question numbers (not all 31)
+- Player selects one number from their personal allocation
+- System displays the question associated with that number
+- Selected questions become unavailable for all other players
+- 1-minute countdown for selection
+- Example: Player assigned numbers [3,7,12,18,25,29] → picks #12 → Question 12 appears
+
+**Phase 5: Preparation Time (30 Seconds)**
+- Question displays on main screen for audience
+- Active player gets 30 seconds to read and prepare
+- Show countdown timer
+- No answer submission allowed during this phase
+- **CRITICAL: Sync with live display** - ensure question appears instantly on main screen
+
+**Phase 6: Answer Phase (30 Seconds)**
+- Player submits answer within 30 seconds
+- System checks correctness automatically
+- **CRITICAL: Real-time sync** - result appears on main display immediately
+- Update team scores across all devices simultaneously
+- Show correct answer if wrong
+
+**Phase 7: Next Player Rotation**
+- Move to next player in same team
+- Repeat phases 4-6
+- Continue until all players in team have answered
+
+**Phase 8: Next Team Transition**
+- After team completes all turns, move to next team
+- Repeat entire process for all 6 teams
+- Continue until competition ends
+
+**CRITICAL TECHNICAL REQUIREMENTS:**
+- **Live Display Sync**: Every action (question selection, answers, scores) must appear instantly on main display
+- Question assignment system: 6 specific numbers per player
+- Question exclusivity tracking across all players
+- Turn state management with real-time updates
+- Multiple timer systems with live countdown display
+- WebSocket events for immediate screen synchronization
+
+**UI ELEMENTS:**
+- Personal question number grid (6 numbers only per player)
+- Timer displays synced across all devices
+- Team/player turn indicators on main display
+- Score tracking with live updates
+- Main display screen with professional Ramadan banner
+
+Ensure perfect synchronization between player devices and main display throughout entire competition.
