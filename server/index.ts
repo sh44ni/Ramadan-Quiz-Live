@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupWebSocket } from "./websocket";
 import path from "path";
@@ -24,10 +23,6 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
-
-app.get("/health", (_req, res) => {
-  res.status(200).send("ok");
-});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -66,20 +61,35 @@ app.use((req, res, next) => {
   next();
 });
 
+let appReady = false;
+
 if (process.env.NODE_ENV === "production") {
   const distPath = path.resolve(__dirname, "public");
+  const indexPath = path.resolve(distPath, "index.html");
+
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
     log("static assets served from " + distPath, "static");
   }
+
+  app.get("/", (_req, res) => {
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(200).send("ok");
+    }
+  });
 }
+
+app.get("/health", (_req, res) => {
+  res.status(200).send("ok");
+});
 
 const port = parseInt(process.env.PORT || "5000", 10);
 httpServer.listen(
   {
     port,
     host: "0.0.0.0",
-    reusePort: true,
   },
   () => {
     log(`serving on port ${port}`);
@@ -122,5 +132,6 @@ httpServer.listen(
     await setupVite(httpServer, app);
   }
 
+  appReady = true;
   log("all routes and middleware initialized");
 })();
