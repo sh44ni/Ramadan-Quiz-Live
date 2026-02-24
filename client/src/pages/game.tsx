@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { useGameSocket } from "@/lib/useGameSocket";
@@ -9,7 +9,23 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Moon, ArrowLeft, Lock, Crown, Star, Sparkles, Wifi, WifiOff } from "lucide-react";
+import {
+  Users,
+  Moon,
+  ArrowLeft,
+  Lock,
+  Crown,
+  Star,
+  Sparkles,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  BookOpen,
+  ChevronRight,
+  Clock,
+  XCircle,
+  Zap,
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Game() {
@@ -23,8 +39,9 @@ export default function Game() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [playerTeamId, setPlayerTeamId] = useState<number | null>(null);
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const { gameState, timer, answerResult, connected, submitAnswer } = useGameSocket();
+  const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion } = useGameSocket();
   const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
   const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
 
@@ -88,7 +105,34 @@ export default function Game() {
     [currentQuestion, session, submitAnswer],
   );
 
+  const handleSelectQuestion = useCallback(
+    (questionId: number) => {
+      if (!session) return;
+      selectQuestion(questionId, session.id);
+    },
+    [session, selectQuestion],
+  );
+
   const isMyTurn = playerTeamId ? session?.currentTeamId === playerTeamId : true;
+
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    questions.forEach((q) => {
+      const cat = language === "ar" ? q.categoryAr : q.categoryEn;
+      if (cat) cats.add(cat);
+    });
+    return Array.from(cats);
+  }, [questions, language]);
+
+  const filteredQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      if (categoryFilter === "all") return true;
+      const cat = language === "ar" ? q.categoryAr : q.categoryEn;
+      return cat === categoryFilter;
+    });
+  }, [questions, categoryFilter, language]);
+
+  const availableCount = questions.filter((q) => !answeredQuestionIds.includes(q.id)).length;
 
   if (!authChecked) {
     return (
@@ -204,11 +248,17 @@ export default function Game() {
             <WifiOff className="h-3 w-3" /> {t("reconnecting") || "Reconnecting..."}
           </Badge>
         )}
-        {session.status === "paused" && (
-          <Badge variant="secondary" className="text-amber-500 gap-1">
-            {t("paused")}
+        <div className="flex items-center gap-2">
+          {session.status === "paused" && (
+            <Badge variant="secondary" className="text-amber-500 gap-1">
+              {t("paused")}
+            </Badge>
+          )}
+          <Badge variant="outline" className="text-xs gap-1">
+            <BookOpen className="h-3 w-3" />
+            {availableCount} {t("availableCount")} / {answeredQuestionIds.length} {t("answeredCount")}
           </Badge>
-        )}
+        </div>
       </div>
 
       {currentTeam && (
@@ -253,7 +303,12 @@ export default function Game() {
                     <Crown className="h-3 w-3 text-amber-500" />
                     {currentTeam.captain}
                   </Badge>
-                  {!isMyTurn && (
+                  {isMyTurn ? (
+                    <Badge className="text-xs bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1">
+                      <Zap className="h-3 w-3" />
+                      {t("yourTurn")}
+                    </Badge>
+                  ) : (
                     <Badge variant="secondary" className="text-xs text-amber-600">
                       {t("waitingForTurn") || "Waiting for your turn..."}
                     </Badge>
@@ -338,21 +393,117 @@ export default function Game() {
                 />
               </motion.div>
             ) : (
-              <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Card className="p-8 md:p-12 text-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="mb-4"
-                  >
-                    <Sparkles className="h-12 w-12 text-amber-400/50 mx-auto" />
-                  </motion.div>
-                  <h3 className={`text-lg font-semibold text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                    {isMyTurn ? t("waitingForQuestion") : t("waitingForTurn")}
-                  </h3>
-                  <p className={`text-sm text-muted-foreground/70 mt-2 ${isRTL ? "font-arabic" : ""}`}>
-                    {t("adminWillSelectQuestion")}
-                  </p>
+              <motion.div key="question-select" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Card className="p-4 md:p-5">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-amber-500" />
+                      <h3 className={`text-lg font-bold ${isRTL ? "font-arabic" : ""}`} data-testid="text-select-question-title">
+                        {isMyTurn ? t("selectYourQuestion") : t("waitingForQuestion")}
+                      </h3>
+                    </div>
+                    {isMyTurn && (
+                      <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1">
+                        <Zap className="h-3 w-3" />
+                        {t("tapToSelect")}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                    <Button
+                      size="sm"
+                      variant={categoryFilter === "all" ? "default" : "outline"}
+                      onClick={() => setCategoryFilter("all")}
+                      className="shrink-0 text-xs"
+                      data-testid="button-filter-all"
+                    >
+                      {t("allCategoriesShort")}
+                    </Button>
+                    {categories.map((cat) => (
+                      <Button
+                        key={cat}
+                        size="sm"
+                        variant={categoryFilter === cat ? "default" : "outline"}
+                        onClick={() => setCategoryFilter(cat)}
+                        className={`shrink-0 text-xs ${isRTL ? "font-arabic" : ""}`}
+                        data-testid={`button-filter-${cat}`}
+                      >
+                        {cat}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2 max-h-[60vh] overflow-y-auto" data-testid="question-list">
+                    {filteredQuestions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                        <p className={isRTL ? "font-arabic" : ""}>{t("noAvailableQuestions")}</p>
+                      </div>
+                    ) : (
+                      filteredQuestions.map((q, idx) => {
+                        const isAnswered = answeredQuestionIds.includes(q.id);
+                        const questionText = language === "ar" ? q.textAr : q.textEn;
+                        const category = language === "ar" ? q.categoryAr : q.categoryEn;
+                        const globalIdx = questions.findIndex((gq) => gq.id === q.id) + 1;
+
+                        return (
+                          <motion.button
+                            key={q.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.03 }}
+                            onClick={() => !isAnswered && isMyTurn && handleSelectQuestion(q.id)}
+                            disabled={isAnswered || !isMyTurn}
+                            className={`w-full text-start p-3 md:p-4 rounded-lg border-2 transition-all duration-200 ${
+                              isAnswered
+                                ? "bg-muted/30 border-transparent opacity-50 cursor-not-allowed"
+                                : isMyTurn
+                                  ? "bg-card border-border hover:border-amber-400/60 hover:bg-amber-500/5 hover:shadow-md cursor-pointer active:scale-[0.99]"
+                                  : "bg-card border-border opacity-70 cursor-not-allowed"
+                            }`}
+                            data-testid={`button-question-${q.id}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-xs font-bold ${
+                                isAnswered
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-amber-500/15 text-amber-600"
+                              }`}>
+                                {isAnswered ? (
+                                  <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  globalIdx
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm md:text-base font-medium leading-relaxed line-clamp-2 ${isRTL ? "font-arabic text-right" : ""}`}>
+                                  {questionText}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  <Badge variant="secondary" className={`text-[10px] ${isRTL ? "font-arabic" : ""}`}>
+                                    {category}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {q.difficulty === "easy" ? t("easy") : q.difficulty === "hard" ? t("hard") : t("medium")}
+                                  </Badge>
+                                  {isAnswered && (
+                                    <Badge variant="secondary" className={`text-[10px] gap-0.5 ${isRTL ? "font-arabic" : ""}`}>
+                                      <CheckCircle2 className="h-2.5 w-2.5" />
+                                      {t("questionAlreadyAnswered")}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              {!isAnswered && isMyTurn && (
+                                <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 mt-1 ${isRTL ? "rotate-180" : ""}`} />
+                              )}
+                            </div>
+                          </motion.button>
+                        );
+                      })
+                    )}
+                  </div>
                 </Card>
               </motion.div>
             )}

@@ -381,6 +381,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
           });
         }
 
+        await storage.updateSession(showSessionId, { currentQuestionId: null });
+
         broadcast({
           type: "answer-result",
           isCorrect: false,
@@ -388,6 +390,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
           answerGiven: "",
           teamId: showTeamId,
         });
+
+        await broadcastGameState();
 
         setTimeout(async () => {
           const advanced = await checkTeamCompletionAndAdvance(showSessionId, showTeamId);

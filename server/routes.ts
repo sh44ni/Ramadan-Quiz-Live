@@ -288,6 +288,8 @@ export async function registerRoutes(
         });
       }
 
+      broadcast({ type: "game-started" });
+      await broadcastGameState();
       res.json({ session });
     } catch (error) {
       res.status(500).json({ message: "Failed to start game" });
@@ -298,7 +300,10 @@ export async function registerRoutes(
     try {
       const session = await storage.getActiveSession();
       if (!session) return res.status(404).json({ message: "No active session" });
+      stopTimer();
       const updated = await storage.updateSession(session.id, { status: "paused" });
+      broadcast({ type: "game-paused" });
+      await broadcastGameState();
       res.json({ session: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to pause game" });
@@ -310,6 +315,8 @@ export async function registerRoutes(
       const session = await storage.getActiveSession();
       if (!session) return res.status(404).json({ message: "No session found" });
       const updated = await storage.updateSession(session.id, { status: "active" });
+      broadcast({ type: "game-resumed" });
+      await broadcastGameState();
       res.json({ session: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to resume game" });
@@ -320,7 +327,10 @@ export async function registerRoutes(
     try {
       const session = await storage.getActiveSession();
       if (!session) return res.status(404).json({ message: "No active session" });
+      stopTimer();
       const updated = await storage.updateSession(session.id, { status: "finished" });
+      broadcast({ type: "game-finished" });
+      await broadcastGameState();
       res.json({ session: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to end game" });
@@ -329,10 +339,13 @@ export async function registerRoutes(
 
   app.post("/api/game/reset", requireAdmin, async (_req, res) => {
     try {
+      stopTimer();
       const session = await storage.getActiveSession();
       if (session) {
         await storage.updateSession(session.id, { status: "finished" });
       }
+      broadcast({ type: "game-reset" });
+      await broadcastGameState();
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to reset game" });
@@ -414,6 +427,9 @@ export async function registerRoutes(
     try {
       const { sessionId, questionId } = req.body;
       const updated = await storage.updateSession(sessionId, { currentQuestionId: questionId });
+      const question = await storage.getQuestion(questionId);
+      broadcast({ type: "question-selected", question, questionId });
+      await broadcastGameState();
       res.json({ session: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to select question" });
@@ -484,6 +500,7 @@ export async function registerRoutes(
       const session = await storage.getActiveSession();
       if (!session) return res.status(404).json({ message: "No active session" });
 
+      stopTimer();
       const teams = await storage.getTeams();
       const currentIndex = teams.findIndex((t) => t.id === session.currentTeamId);
       const nextTeam = teams[(currentIndex + 1) % teams.length];
@@ -493,6 +510,8 @@ export async function registerRoutes(
         currentQuestionId: null,
       });
 
+      broadcast({ type: "turn-changed", teamId: nextTeam.id });
+      await broadcastGameState();
       res.json({ session: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to skip" });
@@ -512,6 +531,7 @@ export async function registerRoutes(
         score: Math.max(0, teamScore.score + points),
       });
 
+      await broadcastGameState();
       res.json({ score: updated });
     } catch (error) {
       res.status(500).json({ message: "Failed to adjust score" });
