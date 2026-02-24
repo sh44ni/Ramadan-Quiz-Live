@@ -1330,34 +1330,43 @@ export default function Admin() {
                 dir="ltr"
                 data-testid="input-new-email"
               />
-              <Input
-                type="text"
-                placeholder={t("playerName")}
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                data-testid="input-new-name"
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                type="text"
-                placeholder={t("playerName") + " (" + t("arabic") + ")"}
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
-                className="font-arabic"
-                data-testid="input-new-player-name"
-              />
-              <Select value={newTeamId} onValueChange={setNewTeamId}>
-                <SelectTrigger data-testid="select-team-assignment">
-                  <SelectValue placeholder={t("selectTeamAssignment")} />
+              <Select
+                value={newName ? `${newTeamId}::${newName}::${newPlayerName}` : ""}
+                onValueChange={(val) => {
+                  if (val) {
+                    const [teamId, name, playerName] = val.split("::");
+                    setNewTeamId(teamId);
+                    setNewName(name);
+                    setNewPlayerName(playerName || "");
+                  }
+                }}
+              >
+                <SelectTrigger data-testid="select-player-name">
+                  <SelectValue placeholder={t("selectPlayer")}>
+                    {newName && (
+                      <span className="font-arabic">{newPlayerName || newName}</span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">{t("noTeam")}</SelectItem>
-                  {teams.map((team: Team) => (
-                    <SelectItem key={team.id} value={String(team.id)}>
-                      {language === "ar" ? team.nameAr : team.nameEn}
-                    </SelectItem>
-                  ))}
+                  {teams.map((team: Team) => {
+                    const allPlayers = [team.captain, ...team.members.filter((m: string) => m !== team.captain)];
+                    return (
+                      <div key={team.id}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground font-arabic">
+                          {language === "ar" ? team.nameAr : team.nameEn}
+                        </div>
+                        {allPlayers.map((player: string) => (
+                          <SelectItem
+                            key={`${team.id}-${player}`}
+                            value={`${team.id}::${player}::${player}`}
+                          >
+                            <span className="font-arabic">{player}</span>
+                          </SelectItem>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Button
