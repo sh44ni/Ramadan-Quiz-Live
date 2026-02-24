@@ -331,6 +331,7 @@ async function startAnswerPhase() {
 }
 
 async function handleAnswerTimeout() {
+  log(`Answer timeout fired: selectedQ=${gameState.selectedQuestionId}, session=${gameState.sessionId}`, "ws");
   if (!gameState.selectedQuestionId || !gameState.sessionId) {
     await advanceToNextPlayer();
     return;
@@ -384,15 +385,23 @@ async function handleAnswerTimeout() {
 }
 
 async function handleAnswerSubmission(answer: string) {
-  if (gameState.phase !== "answer" || !gameState.selectedQuestionId || !gameState.sessionId) return;
+  log(`Answer submission received: answer="${answer}", phase="${gameState.phase}", selectedQ=${gameState.selectedQuestionId}, session=${gameState.sessionId}`, "ws");
+  if (gameState.phase !== "answer" || !gameState.selectedQuestionId || !gameState.sessionId) {
+    log(`Answer rejected: phase=${gameState.phase}, selectedQ=${gameState.selectedQuestionId}, session=${gameState.sessionId}`, "ws");
+    return;
+  }
 
   stopTimer();
 
   const question = await storage.getQuestion(gameState.selectedQuestionId);
-  if (!question) return;
+  if (!question) {
+    log(`Answer rejected: question not found for id ${gameState.selectedQuestionId}`, "ws");
+    return;
+  }
 
   const teamId = getCurrentTeamId()!;
-  const isCorrect = answer === question.correctAnswer;
+  const isCorrect = answer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
+  log(`Answer check: given="${answer}", correct="${question.correctAnswer}", isCorrect=${isCorrect}, teamId=${teamId}`, "ws");
 
   const alreadyAnswered = await storage.getAnsweredQuestionIds(gameState.sessionId);
   if (alreadyAnswered.includes(gameState.selectedQuestionId)) return;
@@ -635,11 +644,18 @@ async function handleMessage(ws: WebSocket, raw: string) {
       }
 
       case "submit-answer": {
-        if (gameState.phase !== "answer") return;
+        log(`submit-answer received: answer="${msg.answer}", teamId=${msg.teamId}, phase=${gameState.phase}`, "ws");
+        if (gameState.phase !== "answer") {
+          log(`submit-answer rejected: wrong phase "${gameState.phase}"`, "ws");
+          return;
+        }
 
         const { answer, teamId: ansTeamId } = msg;
         const curTeamId = getCurrentTeamId();
-        if (ansTeamId !== curTeamId) return;
+        if (ansTeamId !== curTeamId) {
+          log(`submit-answer rejected: team mismatch sent=${ansTeamId} current=${curTeamId}`, "ws");
+          return;
+        }
 
         await handleAnswerSubmission(answer);
         break;
