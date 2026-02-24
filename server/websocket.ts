@@ -3,39 +3,55 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { log } from "./index";
 
-interface GameState {
-  session: any;
-  scores: any[];
-  answeredQuestionIds: number[];
-  teams: any[];
-  questions: any[];
-  currentQuestion: any | null;
-  timerSeconds: number;
+type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "finished";
+
+interface PlayerInfo {
+  name: string;
+  teamId: number;
+  assignedNumbers: number[];
 }
 
-type WSMessage =
-  | { type: "select-question"; questionId: number; sessionId: number }
-  | { type: "submit-answer"; answer: string; sessionId: number; teamId: number; questionId: number }
-  | { type: "admin-start" }
-  | { type: "admin-pause" }
-  | { type: "admin-resume" }
-  | { type: "admin-end" }
-  | { type: "admin-reset" }
-  | { type: "admin-skip" }
-  | { type: "admin-set-team"; teamId: number }
-  | { type: "admin-adjust-score"; teamId: number; points: number }
-  | { type: "admin-next-question" }
-  | { type: "admin-select-specific-question"; questionId: number }
-  | { type: "admin-start-timer" }
-  | { type: "admin-show-answer" }
-  | { type: "admin-reset-timer" }
-  | { type: "request-state" };
+interface InMemoryGameState {
+  phase: GamePhase;
+  sessionId: number | null;
+  totalQuestions: number;
+  teamOrder: number[];
+  teamPlayers: Record<number, string[]>;
+  currentTeamIndex: number;
+  currentPlayerIndex: number;
+  playerAssignments: Record<string, number[]>;
+  usedQuestionNumbers: number[];
+  selectedQuestionId: number | null;
+  questionNumberMap: Record<number, number>;
+  timerSeconds: number;
+  timerRunning: boolean;
+  entryTeams: number[];
+  pausedPhase: GamePhase | null;
+  pausedTimerSeconds: number;
+}
 
+const defaultGameState: InMemoryGameState = {
+  phase: "idle",
+  sessionId: null,
+  totalQuestions: 31,
+  teamOrder: [],
+  teamPlayers: {},
+  currentTeamIndex: 0,
+  currentPlayerIndex: 0,
+  playerAssignments: {},
+  usedQuestionNumbers: [],
+  selectedQuestionId: null,
+  questionNumberMap: {},
+  timerSeconds: 0,
+  timerRunning: false,
+  entryTeams: [],
+  pausedPhase: null,
+  pausedTimerSeconds: 0,
+};
+
+let gameState: InMemoryGameState = { ...defaultGameState };
 let wss: WebSocketServer;
 let timerInterval: ReturnType<typeof setInterval> | null = null;
-let currentTimerSeconds = 30;
-let timerRunning = false;
-let teamAdvanceInProgress = false;
 
 function broadcast(data: any) {
   if (!wss) return;
@@ -47,408 +63,495 @@ function broadcast(data: any) {
   });
 }
 
-function startTimer(duration: number) {
-  stopTimer();
-  currentTimerSeconds = duration;
-  timerRunning = true;
-  broadcast({ type: "timer-update", seconds: currentTimerSeconds, running: true });
-
-  timerInterval = setInterval(() => {
-    currentTimerSeconds--;
-    broadcast({ type: "timer-update", seconds: currentTimerSeconds, running: true });
-
-    if (currentTimerSeconds <= 0) {
-      stopTimer();
-      broadcast({ type: "timer-update", seconds: 0, running: false });
-      broadcast({ type: "time-up" });
-      handleTimeUp();
-    }
-  }, 1000);
-}
-
 function stopTimer() {
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
   }
-  timerRunning = false;
+  gameState.timerRunning = false;
 }
 
-const QUESTIONS_PER_TEAM = 5;
+function startTimer(duration: number, onComplete: () => void) {
+  stopTimer();
+  gameState.timerSeconds = duration;
+  gameState.timerRunning = true;
+  broadcast({ type: "timer-update", seconds: gameState.timerSeconds, running: true, phase: gameState.phase });
 
-async function getTeamQuestionCount(sessionId: number, teamId: number): Promise<number> {
-  const history = await storage.getQuestionHistory(sessionId);
-  return history.filter((h) => h.teamId === teamId).length;
-}
+  timerInterval = setInterval(() => {
+    gameState.timerSeconds--;
+    broadcast({ type: "timer-update", seconds: gameState.timerSeconds, running: true, phase: gameState.phase });
 
-async function getNextSequentialQuestion(sessionId: number): Promise<any | null> {
-  const session = await storage.getActiveSession();
-  if (!session) return null;
-
-  const teams = await storage.getTeams();
-  const currentTeamIndex = teams.findIndex((t) => t.id === session.currentTeamId);
-  if (currentTeamIndex === -1) return null;
-
-  const answeredIds = await storage.getAnsweredQuestionIds(sessionId);
-  const allQuestions = await storage.getQuestions();
-
-  const startIdx = currentTeamIndex * QUESTIONS_PER_TEAM;
-  const endIdx = startIdx + QUESTIONS_PER_TEAM;
-  const teamQuestions = allQuestions.slice(startIdx, endIdx);
-
-  const unansweredTeamQ = teamQuestions.filter((q) => !answeredIds.includes(q.id));
-  if (unansweredTeamQ.length > 0) return unansweredTeamQ[0];
-
-  const allUnanswered = allQuestions.filter((q) => !answeredIds.includes(q.id));
-  if (allUnanswered.length === 0) return null;
-  return allUnanswered[0];
-}
-
-async function checkTeamCompletionAndAdvance(sessionId: number, teamId: number): Promise<boolean> {
-  if (teamAdvanceInProgress) return false;
-
-  const count = await getTeamQuestionCount(sessionId, teamId);
-  if (count >= QUESTIONS_PER_TEAM) {
-    teamAdvanceInProgress = true;
-
-    const session = await storage.getActiveSession();
-    if (!session) { teamAdvanceInProgress = false; return true; }
-
-    const teams = await storage.getTeams();
-    const currentIndex = teams.findIndex((t) => t.id === teamId);
-    const nextTeam = teams[(currentIndex + 1) % teams.length];
-
-    const answeredIds = await storage.getAnsweredQuestionIds(sessionId);
-    const allQuestions = await storage.getQuestions();
-
-    const totalExpected = teams.length * QUESTIONS_PER_TEAM;
-    if (answeredIds.length >= totalExpected || answeredIds.length >= allQuestions.length) {
-      await storage.updateSession(sessionId, { status: "finished", currentQuestionId: null });
-      broadcast({ type: "game-finished" });
-    } else {
-      await storage.updateSession(sessionId, {
-        currentTeamId: nextTeam.id,
-        currentQuestionId: null,
-      });
-      broadcast({
-        type: "team-completed",
-        completedTeamId: teamId,
-        nextTeamId: nextTeam.id,
-      });
-      broadcast({ type: "turn-changed", teamId: nextTeam.id });
+    if (gameState.timerSeconds <= 0) {
+      stopTimer();
+      broadcast({ type: "timer-update", seconds: 0, running: false, phase: gameState.phase });
+      onComplete();
     }
-
-    await broadcastGameState();
-    teamAdvanceInProgress = false;
-    return true;
-  }
-  return false;
+  }, 1000);
 }
 
-async function handleTimeUp() {
-  try {
-    const session = await storage.getActiveSession();
-    if (!session || !session.currentQuestionId) return;
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
-    const alreadyAnswered = await storage.getAnsweredQuestionIds(session.id);
-    if (alreadyAnswered.includes(session.currentQuestionId)) return;
+function assignQuestionsToPlayers(teamPlayers: Record<number, string[]>, totalQuestions: number): Record<string, number[]> {
+  const assignments: Record<string, number[]> = {};
+  const allNumbers = Array.from({ length: totalQuestions }, (_, i) => i + 1);
 
-    const question = await storage.getQuestion(session.currentQuestionId);
-    if (!question) return;
-
-    const teamId = session.currentTeamId!;
-    const sessionId = session.id;
-
-    await storage.createQuestionHistory({
-      sessionId,
-      teamId,
-      questionId: session.currentQuestionId,
-      answerGiven: "",
-      isCorrect: false,
-    });
-
-    const teamScore = await storage.getTeamScore(sessionId, teamId);
-    if (teamScore) {
-      await storage.updateTeamScore(teamScore.id, {
-        questionsAnswered: teamScore.questionsAnswered + 1,
-      });
+  const allPlayerKeys: string[] = [];
+  for (const teamId of Object.keys(teamPlayers)) {
+    for (const player of teamPlayers[Number(teamId)]) {
+      allPlayerKeys.push(`${teamId}:${player}`);
     }
-
-    await storage.updateSession(sessionId, { currentQuestionId: null });
-
-    broadcast({
-      type: "answer-result",
-      isCorrect: false,
-      correctAnswer: question.correctAnswer,
-      answerGiven: "",
-      teamId,
-    });
-
-    await broadcastGameState();
-
-    setTimeout(async () => {
-      const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);
-      if (!advanced) {
-        await broadcastGameState();
-      }
-    }, 4000);
-  } catch (error) {
-    log(`Error handling time-up: ${error}`, "ws");
-  }
-}
-
-async function advanceToNextTeam(sessionId: number) {
-  const session = await storage.getActiveSession();
-  if (!session) return;
-
-  const teams = await storage.getTeams();
-  const currentIndex = teams.findIndex((t) => t.id === session.currentTeamId);
-  const nextTeam = teams[(currentIndex + 1) % teams.length];
-
-  const answeredIds = await storage.getAnsweredQuestionIds(sessionId);
-  const allQuestions = await storage.getQuestions();
-
-  if (answeredIds.length >= allQuestions.length) {
-    await storage.updateSession(sessionId, { status: "finished", currentQuestionId: null });
-    broadcast({ type: "game-finished" });
-  } else {
-    await storage.updateSession(sessionId, {
-      currentTeamId: nextTeam.id,
-      currentQuestionId: null,
-    });
-    broadcast({ type: "turn-changed", teamId: nextTeam.id });
   }
 
-  await broadcastGameState();
+  for (const key of allPlayerKeys) {
+    const shuffled = shuffleArray(allNumbers);
+    assignments[key] = shuffled.slice(0, 6);
+  }
+
+  return assignments;
 }
 
-async function broadcastGameState() {
+function getCurrentTeamId(): number | null {
+  if (gameState.teamOrder.length === 0) return null;
+  return gameState.teamOrder[gameState.currentTeamIndex % gameState.teamOrder.length];
+}
+
+function getCurrentPlayerName(): string | null {
+  const teamId = getCurrentTeamId();
+  if (!teamId) return null;
+  const players = gameState.teamPlayers[teamId];
+  if (!players || players.length === 0) return null;
+  return players[gameState.currentPlayerIndex % players.length];
+}
+
+function getPlayerAssignedNumbers(teamId: number, playerName: string): number[] {
+  const key = `${teamId}:${playerName}`;
+  const assigned = gameState.playerAssignments[key] || [];
+  return assigned.filter((n) => !gameState.usedQuestionNumbers.includes(n));
+}
+
+async function buildQuestionNumberMap() {
+  const questions = await storage.getQuestions();
+  const activeQuestions = questions.filter((q) => q.isActive !== false);
+  gameState.questionNumberMap = {};
+  const limited = activeQuestions.slice(0, gameState.totalQuestions);
+  limited.forEach((q, idx) => {
+    gameState.questionNumberMap[idx + 1] = q.id;
+  });
+}
+
+async function broadcastFullState() {
   try {
-    const session = await storage.getActiveSession();
     const teams = await storage.getTeams();
     const questions = await storage.getQuestions();
+    const session = gameState.sessionId ? await storage.getSession(gameState.sessionId) : null;
+    const scores = gameState.sessionId ? await storage.getTeamScores(gameState.sessionId) : [];
+    const answeredQuestionIds = gameState.sessionId ? await storage.getAnsweredQuestionIds(gameState.sessionId) : [];
 
-    if (!session) {
-      broadcast({ type: "game-state", data: { session: null, scores: [], answeredQuestionIds: [], teams, questions, currentQuestion: null, timerSeconds: currentTimerSeconds } });
-      return;
-    }
-
-    const scores = await storage.getTeamScores(session.id);
-    const answeredQuestionIds = await storage.getAnsweredQuestionIds(session.id);
-    const currentQuestion = session.currentQuestionId
-      ? await storage.getQuestion(session.currentQuestionId)
+    const currentTeamId = getCurrentTeamId();
+    const currentPlayerName = getCurrentPlayerName();
+    const currentQuestion = gameState.selectedQuestionId
+      ? await storage.getQuestion(gameState.selectedQuestionId)
       : null;
 
-    const state: GameState = {
-      session,
-      scores,
-      answeredQuestionIds,
-      teams,
-      questions,
-      currentQuestion,
-      timerSeconds: currentTimerSeconds,
-    };
+    const currentPlayerAvailableNumbers = currentTeamId && currentPlayerName
+      ? getPlayerAssignedNumbers(currentTeamId, currentPlayerName)
+      : [];
 
-    broadcast({ type: "game-state", data: state });
+    broadcast({
+      type: "game-state",
+      data: {
+        session,
+        scores,
+        answeredQuestionIds,
+        teams,
+        questions,
+        currentQuestion,
+        timerSeconds: gameState.timerSeconds,
+        phase: gameState.phase,
+        currentTeamId,
+        currentPlayerName,
+        currentPlayerAvailableNumbers,
+        usedQuestionNumbers: gameState.usedQuestionNumbers,
+        teamPlayers: gameState.teamPlayers,
+        playerAssignments: gameState.playerAssignments,
+        entryTeams: gameState.entryTeams,
+        totalQuestions: gameState.totalQuestions,
+        currentTeamIndex: gameState.currentTeamIndex,
+        currentPlayerIndex: gameState.currentPlayerIndex,
+        teamOrder: gameState.teamOrder,
+      },
+    });
   } catch (error) {
     log(`Error broadcasting game state: ${error}`, "ws");
   }
 }
 
+async function startEntryPhase() {
+  gameState.phase = "entry";
+  gameState.entryTeams = [];
+
+  startTimer(60, async () => {
+    await endEntryPhase();
+  });
+
+  broadcast({ type: "phase-changed", phase: "entry" });
+  await broadcastFullState();
+}
+
+async function endEntryPhase() {
+  if (gameState.entryTeams.length === 0) {
+    const teams = await storage.getTeams();
+    gameState.entryTeams = teams.map((t) => t.id);
+  }
+
+  gameState.teamOrder = [...gameState.entryTeams];
+
+  const teams = await storage.getTeams();
+  gameState.teamPlayers = {};
+  for (const team of teams) {
+    if (gameState.teamOrder.includes(team.id)) {
+      const players = [team.captain, ...team.members.filter((m) => m !== team.captain)];
+      gameState.teamPlayers[team.id] = players;
+    }
+  }
+
+  await buildQuestionNumberMap();
+
+  gameState.playerAssignments = assignQuestionsToPlayers(gameState.teamPlayers, gameState.totalQuestions);
+
+  gameState.currentTeamIndex = 0;
+  gameState.currentPlayerIndex = 0;
+
+  broadcast({ type: "entry-closed" });
+  await startSelectionPhase();
+}
+
+async function startSelectionPhase() {
+  gameState.phase = "selection";
+  gameState.selectedQuestionId = null;
+
+  const teamId = getCurrentTeamId();
+  const playerName = getCurrentPlayerName();
+
+  if (teamId && playerName) {
+    const available = getPlayerAssignedNumbers(teamId, playerName);
+    if (available.length === 0) {
+      await advanceToNextPlayer();
+      return;
+    }
+  }
+
+  if (gameState.sessionId) {
+    await storage.updateSession(gameState.sessionId, {
+      currentTeamId: getCurrentTeamId(),
+      currentQuestionId: null,
+    });
+  }
+
+  broadcast({ type: "phase-changed", phase: "selection", currentTeamId: getCurrentTeamId(), currentPlayerName: getCurrentPlayerName() });
+
+  startTimer(60, async () => {
+    await handleSelectionTimeout();
+  });
+
+  await broadcastFullState();
+}
+
+async function handleSelectionTimeout() {
+  const teamId = getCurrentTeamId();
+  const playerName = getCurrentPlayerName();
+
+  if (teamId && playerName) {
+    const available = getPlayerAssignedNumbers(teamId, playerName);
+    if (available.length > 0) {
+      const autoPickNumber = available[0];
+      await handleQuestionSelection(autoPickNumber);
+      return;
+    }
+  }
+
+  await advanceToNextPlayer();
+}
+
+async function handleQuestionSelection(questionNumber: number) {
+  const questionId = gameState.questionNumberMap[questionNumber];
+  if (!questionId) {
+    log(`Question number ${questionNumber} has no mapped question ID`, "ws");
+    return;
+  }
+
+  if (gameState.usedQuestionNumbers.includes(questionNumber)) {
+    log(`Question number ${questionNumber} already used`, "ws");
+    return;
+  }
+
+  gameState.usedQuestionNumbers.push(questionNumber);
+  gameState.selectedQuestionId = questionId;
+
+  if (gameState.sessionId) {
+    await storage.updateSession(gameState.sessionId, { currentQuestionId: questionId });
+  }
+
+  const question = await storage.getQuestion(questionId);
+  broadcast({ type: "question-selected", question, questionId, questionNumber });
+
+  stopTimer();
+  await startPreparationPhase();
+}
+
+async function startPreparationPhase() {
+  gameState.phase = "preparation";
+
+  broadcast({ type: "phase-changed", phase: "preparation" });
+
+  startTimer(30, async () => {
+    await startAnswerPhase();
+  });
+
+  await broadcastFullState();
+}
+
+async function startAnswerPhase() {
+  gameState.phase = "answer";
+
+  broadcast({ type: "phase-changed", phase: "answer" });
+
+  startTimer(30, async () => {
+    await handleAnswerTimeout();
+  });
+
+  await broadcastFullState();
+}
+
+async function handleAnswerTimeout() {
+  if (!gameState.selectedQuestionId || !gameState.sessionId) {
+    await advanceToNextPlayer();
+    return;
+  }
+
+  const question = await storage.getQuestion(gameState.selectedQuestionId);
+  if (!question) {
+    await advanceToNextPlayer();
+    return;
+  }
+
+  const teamId = getCurrentTeamId()!;
+
+  const alreadyAnswered = await storage.getAnsweredQuestionIds(gameState.sessionId);
+  if (!alreadyAnswered.includes(gameState.selectedQuestionId)) {
+    await storage.createQuestionHistory({
+      sessionId: gameState.sessionId,
+      teamId,
+      questionId: gameState.selectedQuestionId,
+      answerGiven: "",
+      isCorrect: false,
+    });
+
+    const teamScore = await storage.getTeamScore(gameState.sessionId, teamId);
+    if (teamScore) {
+      await storage.updateTeamScore(teamScore.id, {
+        questionsAnswered: teamScore.questionsAnswered + 1,
+      });
+    }
+  }
+
+  broadcast({
+    type: "answer-result",
+    isCorrect: false,
+    correctAnswer: question.correctAnswer,
+    answerGiven: "",
+    teamId,
+    timeUp: true,
+  });
+
+  broadcast({ type: "time-up" });
+
+  await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
+  gameState.selectedQuestionId = null;
+
+  await broadcastFullState();
+
+  setTimeout(async () => {
+    await advanceToNextPlayer();
+  }, 4000);
+}
+
+async function handleAnswerSubmission(answer: string) {
+  if (gameState.phase !== "answer" || !gameState.selectedQuestionId || !gameState.sessionId) return;
+
+  stopTimer();
+
+  const question = await storage.getQuestion(gameState.selectedQuestionId);
+  if (!question) return;
+
+  const teamId = getCurrentTeamId()!;
+  const isCorrect = answer === question.correctAnswer;
+
+  const alreadyAnswered = await storage.getAnsweredQuestionIds(gameState.sessionId);
+  if (alreadyAnswered.includes(gameState.selectedQuestionId)) return;
+
+  await storage.createQuestionHistory({
+    sessionId: gameState.sessionId,
+    teamId,
+    questionId: gameState.selectedQuestionId,
+    answerGiven: answer,
+    isCorrect,
+  });
+
+  const teamScore = await storage.getTeamScore(gameState.sessionId, teamId);
+  if (teamScore) {
+    await storage.updateTeamScore(teamScore.id, {
+      score: teamScore.score + (isCorrect ? 1 : 0),
+      questionsAnswered: teamScore.questionsAnswered + 1,
+      correctAnswers: teamScore.correctAnswers + (isCorrect ? 1 : 0),
+    });
+  }
+
+  broadcast({
+    type: "answer-result",
+    isCorrect,
+    correctAnswer: question.correctAnswer,
+    answerGiven: answer,
+    teamId,
+  });
+
+  await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
+  gameState.selectedQuestionId = null;
+
+  await broadcastFullState();
+
+  setTimeout(async () => {
+    await advanceToNextPlayer();
+  }, 4000);
+}
+
+async function advanceToNextPlayer() {
+  const teamId = getCurrentTeamId();
+  if (!teamId) {
+    await endGame();
+    return;
+  }
+
+  const players = gameState.teamPlayers[teamId] || [];
+  const nextPlayerIndex = gameState.currentPlayerIndex + 1;
+
+  if (nextPlayerIndex < players.length) {
+    gameState.currentPlayerIndex = nextPlayerIndex;
+    await startSelectionPhase();
+  } else {
+    await advanceToNextTeam();
+  }
+}
+
+async function advanceToNextTeam() {
+  const nextTeamIndex = gameState.currentTeamIndex + 1;
+
+  if (nextTeamIndex >= gameState.teamOrder.length) {
+    if (hasAnyPlayerWithAvailableQuestions()) {
+      gameState.currentTeamIndex = 0;
+      gameState.currentPlayerIndex = 0;
+      await startSelectionPhase();
+    } else {
+      await endGame();
+    }
+    return;
+  }
+
+  gameState.currentTeamIndex = nextTeamIndex;
+  gameState.currentPlayerIndex = 0;
+
+  const teamId = getCurrentTeamId()!;
+  broadcast({
+    type: "team-completed",
+    completedTeamId: gameState.teamOrder[nextTeamIndex - 1],
+    nextTeamId: teamId,
+  });
+  broadcast({ type: "turn-changed", teamId });
+
+  await broadcastFullState();
+
+  setTimeout(async () => {
+    await startSelectionPhase();
+  }, 3000);
+}
+
+function hasAnyPlayerWithAvailableQuestions(): boolean {
+  for (const teamId of gameState.teamOrder) {
+    const players = gameState.teamPlayers[teamId] || [];
+    for (const player of players) {
+      const available = getPlayerAssignedNumbers(teamId, player);
+      if (available.length > 0) return true;
+    }
+  }
+  return false;
+}
+
+async function endGame() {
+  stopTimer();
+  gameState.phase = "finished";
+
+  if (gameState.sessionId) {
+    await storage.updateSession(gameState.sessionId, { status: "finished", currentQuestionId: null });
+  }
+
+  broadcast({ type: "game-finished" });
+  broadcast({ type: "phase-changed", phase: "finished" });
+  await broadcastFullState();
+}
+
 async function handleMessage(ws: WebSocket, raw: string) {
   try {
-    const msg: WSMessage = JSON.parse(raw);
+    const msg = JSON.parse(raw);
 
     switch (msg.type) {
       case "request-state": {
-        const session = await storage.getActiveSession();
         const teams = await storage.getTeams();
         const questions = await storage.getQuestions();
+        const session = gameState.sessionId ? await storage.getSession(gameState.sessionId) : null;
+        const scores = gameState.sessionId ? await storage.getTeamScores(gameState.sessionId) : [];
+        const answeredQuestionIds = gameState.sessionId ? await storage.getAnsweredQuestionIds(gameState.sessionId) : [];
+        const currentQuestion = gameState.selectedQuestionId
+          ? await storage.getQuestion(gameState.selectedQuestionId)
+          : null;
 
-        if (!session) {
-          ws.send(JSON.stringify({ type: "game-state", data: { session: null, scores: [], answeredQuestionIds: [], teams, questions, currentQuestion: null, timerSeconds: 30 } }));
-          return;
-        }
-
-        const scores = await storage.getTeamScores(session.id);
-        const answeredQuestionIds = await storage.getAnsweredQuestionIds(session.id);
-        const currentQuestion = session.currentQuestionId ? await storage.getQuestion(session.currentQuestionId) : null;
+        const currentTeamId = getCurrentTeamId();
+        const currentPlayerName = getCurrentPlayerName();
+        const currentPlayerAvailableNumbers = currentTeamId && currentPlayerName
+          ? getPlayerAssignedNumbers(currentTeamId, currentPlayerName)
+          : [];
 
         ws.send(JSON.stringify({
           type: "game-state",
-          data: { session, scores, answeredQuestionIds, teams, questions, currentQuestion, timerSeconds: currentTimerSeconds },
+          data: {
+            session,
+            scores,
+            answeredQuestionIds,
+            teams,
+            questions,
+            currentQuestion,
+            timerSeconds: gameState.timerSeconds,
+            phase: gameState.phase,
+            currentTeamId,
+            currentPlayerName,
+            currentPlayerAvailableNumbers,
+            usedQuestionNumbers: gameState.usedQuestionNumbers,
+            teamPlayers: gameState.teamPlayers,
+            playerAssignments: gameState.playerAssignments,
+            entryTeams: gameState.entryTeams,
+            totalQuestions: gameState.totalQuestions,
+            currentTeamIndex: gameState.currentTeamIndex,
+            currentPlayerIndex: gameState.currentPlayerIndex,
+            teamOrder: gameState.teamOrder,
+          },
         }));
-        ws.send(JSON.stringify({ type: "timer-update", seconds: currentTimerSeconds, running: timerRunning }));
-        break;
-      }
-
-      case "select-question": {
-        const { questionId, sessionId } = msg;
-        await storage.updateSession(sessionId, { currentQuestionId: questionId });
-        const question = await storage.getQuestion(questionId);
-
-        broadcast({ type: "question-selected", question, questionId });
-        currentTimerSeconds = 30;
-        broadcast({ type: "timer-update", seconds: 30, running: false });
-        await broadcastGameState();
-        break;
-      }
-
-      case "admin-next-question": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        stopTimer();
-
-        const currentTeamId = session.currentTeamId!;
-        const teamQCount = await getTeamQuestionCount(session.id, currentTeamId);
-        if (teamQCount >= QUESTIONS_PER_TEAM) {
-          const advanced = await checkTeamCompletionAndAdvance(session.id, currentTeamId);
-          if (advanced) return;
-        }
-
-        const nextQ = await getNextSequentialQuestion(session.id);
-        if (!nextQ) {
-          await storage.updateSession(session.id, { status: "finished", currentQuestionId: null });
-          broadcast({ type: "game-finished" });
-          await broadcastGameState();
-          return;
-        }
-
-        await storage.updateSession(session.id, { currentQuestionId: nextQ.id });
-        currentTimerSeconds = 30;
-        broadcast({ type: "question-selected", question: nextQ, questionId: nextQ.id });
-        broadcast({ type: "timer-update", seconds: 30, running: false });
-        await broadcastGameState();
-        break;
-      }
-
-      case "admin-select-specific-question": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        stopTimer();
-
-        const question = await storage.getQuestion(msg.questionId);
-        if (!question) return;
-
-        await storage.updateSession(session.id, { currentQuestionId: question.id });
-        currentTimerSeconds = 30;
-        broadcast({ type: "question-selected", question, questionId: question.id });
-        broadcast({ type: "timer-update", seconds: 30, running: false });
-        await broadcastGameState();
-        break;
-      }
-
-      case "admin-start-timer": {
-        const session = await storage.getActiveSession();
-        if (!session || !session.currentQuestionId) return;
-        startTimer(currentTimerSeconds > 0 ? currentTimerSeconds : 30);
-        break;
-      }
-
-      case "admin-reset-timer": {
-        stopTimer();
-        currentTimerSeconds = 30;
-        broadcast({ type: "timer-update", seconds: 30, running: false });
-        break;
-      }
-
-      case "admin-show-answer": {
-        const session = await storage.getActiveSession();
-        if (!session || !session.currentQuestionId) return;
-        stopTimer();
-
-        const alreadyAnswered = await storage.getAnsweredQuestionIds(session.id);
-        if (alreadyAnswered.includes(session.currentQuestionId)) return;
-
-        const question = await storage.getQuestion(session.currentQuestionId);
-        if (!question) return;
-
-        const showTeamId = session.currentTeamId!;
-        const showSessionId = session.id;
-
-        await storage.createQuestionHistory({
-          sessionId: showSessionId,
-          teamId: showTeamId,
-          questionId: session.currentQuestionId,
-          answerGiven: "",
-          isCorrect: false,
-        });
-
-        const teamScore = await storage.getTeamScore(showSessionId, showTeamId);
-        if (teamScore) {
-          await storage.updateTeamScore(teamScore.id, {
-            questionsAnswered: teamScore.questionsAnswered + 1,
-          });
-        }
-
-        await storage.updateSession(showSessionId, { currentQuestionId: null });
-
-        broadcast({
-          type: "answer-result",
-          isCorrect: false,
-          correctAnswer: question.correctAnswer,
-          answerGiven: "",
-          teamId: showTeamId,
-        });
-
-        await broadcastGameState();
-
-        setTimeout(async () => {
-          const advanced = await checkTeamCompletionAndAdvance(showSessionId, showTeamId);
-          if (!advanced) {
-            await broadcastGameState();
-          }
-        }, 4000);
-        break;
-      }
-
-      case "submit-answer": {
-        const { answer, sessionId, teamId, questionId } = msg;
-        stopTimer();
-
-        const alreadyAnswered = await storage.getAnsweredQuestionIds(sessionId);
-        if (alreadyAnswered.includes(questionId)) return;
-
-        const question = await storage.getQuestion(questionId);
-        if (!question) return;
-
-        const isCorrect = answer === question.correctAnswer;
-
-        await storage.createQuestionHistory({
-          sessionId,
-          teamId,
-          questionId,
-          answerGiven: answer,
-          isCorrect,
-        });
-
-        const teamScore = await storage.getTeamScore(sessionId, teamId);
-        if (teamScore) {
-          await storage.updateTeamScore(teamScore.id, {
-            score: teamScore.score + (isCorrect ? 1 : 0),
-            questionsAnswered: teamScore.questionsAnswered + 1,
-            correctAnswers: teamScore.correctAnswers + (isCorrect ? 1 : 0),
-          });
-        }
-
-        await storage.updateSession(sessionId, { currentQuestionId: null });
-
-        broadcast({
-          type: "answer-result",
-          isCorrect,
-          correctAnswer: question.correctAnswer,
-          answerGiven: answer,
-          teamId,
-        });
-
-        await broadcastGameState();
-
-        setTimeout(async () => {
-          const advanced = await checkTeamCompletionAndAdvance(sessionId, teamId);
-          if (!advanced) {
-            await broadcastGameState();
-          }
-        }, 4000);
+        ws.send(JSON.stringify({ type: "timer-update", seconds: gameState.timerSeconds, running: gameState.timerRunning, phase: gameState.phase }));
         break;
       }
 
@@ -473,91 +576,183 @@ async function handleMessage(ws: WebSocket, raw: string) {
           });
         }
 
-        currentTimerSeconds = 30;
+        gameState = {
+          ...defaultGameState,
+          sessionId: session.id,
+          totalQuestions: Math.min(31, (await storage.getQuestions()).filter(q => q.isActive !== false).length),
+        };
+
         broadcast({ type: "game-started" });
-        await broadcastGameState();
+        await startEntryPhase();
+        break;
+      }
+
+      case "admin-skip-entry": {
+        if (gameState.phase === "entry") {
+          stopTimer();
+          await endEntryPhase();
+        }
+        break;
+      }
+
+      case "team-join": {
+        if (gameState.phase === "entry" && msg.teamId) {
+          if (!gameState.entryTeams.includes(msg.teamId)) {
+            gameState.entryTeams.push(msg.teamId);
+            broadcast({ type: "team-joined", teamId: msg.teamId });
+            await broadcastFullState();
+          }
+        }
+        break;
+      }
+
+      case "player-select-question": {
+        if (gameState.phase !== "selection") return;
+
+        const { questionNumber, teamId, playerName } = msg;
+        const currentTeamId = getCurrentTeamId();
+        const currentPlayer = getCurrentPlayerName();
+
+        if (teamId !== currentTeamId || playerName !== currentPlayer) {
+          ws.send(JSON.stringify({ type: "error", message: "Not your turn" }));
+          return;
+        }
+
+        const available = getPlayerAssignedNumbers(teamId, playerName);
+        if (!available.includes(questionNumber)) {
+          ws.send(JSON.stringify({ type: "error", message: "Question not available" }));
+          return;
+        }
+
+        await handleQuestionSelection(questionNumber);
+        break;
+      }
+
+      case "submit-answer": {
+        if (gameState.phase !== "answer") return;
+
+        const { answer, teamId: ansTeamId } = msg;
+        const curTeamId = getCurrentTeamId();
+        if (ansTeamId !== curTeamId) return;
+
+        await handleAnswerSubmission(answer);
         break;
       }
 
       case "admin-pause": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
+        if (gameState.phase === "idle" || gameState.phase === "finished" || gameState.phase === "paused") return;
+        gameState.pausedPhase = gameState.phase;
+        gameState.pausedTimerSeconds = gameState.timerSeconds;
         stopTimer();
-        await storage.updateSession(session.id, { status: "paused" });
+        gameState.phase = "paused";
+
+        if (gameState.sessionId) {
+          await storage.updateSession(gameState.sessionId, { status: "paused" });
+        }
+
         broadcast({ type: "game-paused" });
-        await broadcastGameState();
+        broadcast({ type: "phase-changed", phase: "paused" });
+        await broadcastFullState();
         break;
       }
 
       case "admin-resume": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        await storage.updateSession(session.id, { status: "active" });
-        broadcast({ type: "game-resumed" });
-        if (session.currentQuestionId && currentTimerSeconds > 0) {
-          startTimer(currentTimerSeconds);
+        if (gameState.phase !== "paused" || !gameState.pausedPhase) return;
+        const resumePhase = gameState.pausedPhase;
+        gameState.phase = resumePhase;
+        gameState.pausedPhase = null;
+
+        if (gameState.sessionId) {
+          await storage.updateSession(gameState.sessionId, { status: "active" });
         }
-        await broadcastGameState();
+
+        broadcast({ type: "game-resumed" });
+        broadcast({ type: "phase-changed", phase: resumePhase });
+
+        if (gameState.pausedTimerSeconds > 0) {
+          const timerDuration = gameState.pausedTimerSeconds;
+          gameState.pausedTimerSeconds = 0;
+
+          const getTimerCallback = () => {
+            switch (resumePhase) {
+              case "entry": return () => endEntryPhase();
+              case "selection": return () => handleSelectionTimeout();
+              case "preparation": return () => startAnswerPhase();
+              case "answer": return () => handleAnswerTimeout();
+              default: return () => {};
+            }
+          };
+
+          startTimer(timerDuration, getTimerCallback());
+        }
+
+        await broadcastFullState();
         break;
       }
 
       case "admin-end": {
-        stopTimer();
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        await storage.updateSession(session.id, { status: "finished" });
-        broadcast({ type: "game-finished" });
-        await broadcastGameState();
+        await endGame();
         break;
       }
 
       case "admin-reset": {
         stopTimer();
-        currentTimerSeconds = 30;
-        const session = await storage.getActiveSession();
-        if (session) {
-          await storage.updateSession(session.id, { status: "finished" });
+        if (gameState.sessionId) {
+          await storage.updateSession(gameState.sessionId, { status: "finished" });
         }
+        gameState = { ...defaultGameState };
         broadcast({ type: "game-reset" });
-        await broadcastGameState();
+        broadcast({ type: "phase-changed", phase: "idle" });
+        await broadcastFullState();
         break;
       }
 
       case "admin-skip": {
-        stopTimer();
-        const session = await storage.getActiveSession();
-        if (!session) return;
-
-        await storage.updateSession(session.id, {
-          currentQuestionId: null,
-        });
-
-        await advanceToNextTeam(session.id);
+        if (gameState.phase === "selection" || gameState.phase === "preparation" || gameState.phase === "answer") {
+          stopTimer();
+          gameState.selectedQuestionId = null;
+          if (gameState.sessionId) {
+            await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
+          }
+          await advanceToNextPlayer();
+        }
         break;
       }
 
       case "admin-set-team": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        stopTimer();
-        await storage.updateSession(session.id, {
-          currentTeamId: msg.teamId,
-          currentQuestionId: null,
-        });
-        broadcast({ type: "turn-changed", teamId: msg.teamId });
-        await broadcastGameState();
+        if (gameState.phase !== "idle" && gameState.phase !== "finished") {
+          const teamIdx = gameState.teamOrder.indexOf(msg.teamId);
+          if (teamIdx >= 0) {
+            stopTimer();
+            gameState.currentTeamIndex = teamIdx;
+            gameState.currentPlayerIndex = 0;
+            broadcast({ type: "turn-changed", teamId: msg.teamId });
+            await startSelectionPhase();
+          }
+        }
         break;
       }
 
       case "admin-adjust-score": {
-        const session = await storage.getActiveSession();
-        if (!session) return;
-        const teamScore = await storage.getTeamScore(session.id, msg.teamId);
+        if (!gameState.sessionId) return;
+        const teamScore = await storage.getTeamScore(gameState.sessionId, msg.teamId);
         if (!teamScore) return;
         await storage.updateTeamScore(teamScore.id, {
           score: Math.max(0, teamScore.score + msg.points),
         });
-        await broadcastGameState();
+        await broadcastFullState();
+        break;
+      }
+
+      case "admin-force-advance": {
+        if (gameState.phase === "selection" || gameState.phase === "preparation" || gameState.phase === "answer") {
+          stopTimer();
+          gameState.selectedQuestionId = null;
+          if (gameState.sessionId) {
+            await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
+          }
+          await advanceToNextPlayer();
+        }
         break;
       }
     }
@@ -584,4 +779,4 @@ export function setupWebSocket(server: Server) {
   log("WebSocket server initialized on /ws", "ws");
 }
 
-export { broadcast, broadcastGameState, stopTimer, startTimer };
+export { broadcast, broadcastFullState as broadcastGameState, stopTimer, startTimer };

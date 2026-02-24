@@ -1,7 +1,7 @@
 # Ramadan Quiz Competition
 
 ## Overview
-A live bilingual (Arabic/English) Ramadan quiz competition web app where 6 teams compete, answering 36 questions with real-time scoring powered by WebSocket. Designed for a **two-device setup**: team devices for selecting/answering questions and a large audience display screen for spectators. Features admin controls, email-based OTP access, full internationalization with RTL support, and a Ramadan-themed design.
+A live bilingual (Arabic/English) Ramadan quiz competition web app where 6 teams compete with a player-driven game flow. Features 31 questions total, ~4 players per team, where each player receives 6 randomly assigned question numbers. Game progresses through distinct phases: Entry (60s for teams to join) → Selection (60s for active player to pick from their assigned numbers) → Preparation (30s to read question) → Answer (30s to submit). Players rotate sequentially within teams, then teams rotate. All coordination happens via real-time WebSocket communication. Designed for a **two-device setup**: team devices for selecting/answering questions and a large audience display screen for spectators. Features admin controls, email-based OTP access, full internationalization with RTL support, and a Ramadan-themed design.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript, shadcn/ui, Tailwind CSS, Framer Motion
@@ -81,58 +81,62 @@ The app is designed for a live event with two types of screens:
 
 ### Admin Panel (`/admin`)
 - Password-protected (uses SESSION_SECRET environment variable)
-- **Admin-controlled workflow**: Admin drives all question selection and timing
+- **Phase-based controls**: Admin monitors and can intervene in the player-driven flow
 - All game controls operate via WebSocket for instant effect:
-  - **Start New Game**: Creates a new session, initializes scores for all 6 teams
-  - **Next Question**: Selects the next sequential question for the current team
-  - **Start Timer**: Manually starts the 30-second countdown
-  - **Show Answer**: Reveals correct answer (when timer hasn't started or for manual reveal)
-  - **Reset Timer**: Resets timer back to 30 seconds
-  - **Pause/Resume**: Freezes/continues the timer and game state
-  - **Skip**: Moves to the next team without answering
+  - **Start Game**: Begins entry phase (60s countdown for teams to join)
+  - **Skip Entry**: Immediately ends entry phase and starts selection
+  - **Pause/Resume**: Freezes/continues current phase timer
+  - **Force Advance**: Manually advance to next phase/turn
   - **End Game**: Finishes the game, triggers results display
-  - **Reset**: Ends current session and clears state
+  - **Reset**: Ends current session and clears all state
   - **Set Current Team**: Manually select which team goes next
   - **Adjust Score**: Add or remove points for any team (+/- 1)
-- Question Control section shows current question preview with category badge
+- Shows current phase, active player, and timer status
 - Has a "Display Screen" button to open `/display` in a new tab
-- Shows live game status, current team, and all team scores
 
 ## WebSocket Architecture
 
+### Game Phases
+1. **Entry** (60s): Teams join the game via their devices
+2. **Selection** (60s): Active player picks from their 6 assigned question numbers
+3. **Preparation** (30s): Question displayed for reading
+4. **Answer** (30s): Player submits their answer
+- Auto-transitions between phases with timeout handlers
+- Auto-pick on selection timeout (lowest available number)
+- Sequential player rotation within teams, then team rotation
+
 ### Server (`server/websocket.ts`)
 - WebSocket server at path `/ws`
-- **Server-side timer**: Countdown runs on the server and broadcasts to all clients, ensuring perfect synchronization with no client drift
-- **Auto time-up handling**: When timer hits 0, server automatically submits an empty answer and shows the correct answer (admin controls progression to next question/team)
-- **Race condition prevention**: Duplicate answer guards prevent double-submission if timer and user answer race
+- **In-memory game state**: Phase, turn indices, player assignments, question number mappings stored in memory (no DB schema changes)
+- **Per-player question assignments**: Each player gets 6 randomly assigned numbers from 1-31 (may overlap between players)
+- **Server-side timers**: Countdown runs on server with auto-transition to next phase
+- **Full state broadcast**: `broadcastFullState()` called after every state change for consistency
+- **Race condition prevention**: Duplicate answer guards and used question tracking
 
 ### Client Hook (`client/src/lib/useGameSocket.ts`)
 - `useGameSocket()` hook manages all real-time state
+- GameState includes: phase, currentTeamId, currentPlayerName, currentPlayerAvailableNumbers, usedQuestionNumbers, teamPlayers, playerAssignments, entryTeams, totalQuestions, currentTeamIndex, currentPlayerIndex, teamOrder
 - Auto-connects with reconnection on disconnect (2-second retry)
-- All event types handled with immediate state updates (question-selected, turn-changed, game status changes, time-up, game-reset)
 - Returns: `gameState`, `timer`, `answerResult`, `connected`, plus action functions
-
-### Broadcast Consistency
-- Both WebSocket `submit-answer` handler AND HTTP `POST /api/game/answer` route broadcast `answer-result` and `broadcastGameState()` to all WebSocket clients
-- `currentQuestionId` is cleared immediately after answer submission (WebSocket, HTTP, and time-up handlers) to prevent stale question display on audience screen
 
 ### WebSocket Events
 | Event | Direction | Description |
 |-------|-----------|-------------|
 | `request-state` | Client → Server | Request current full game state |
-| `game-state` | Server → Client | Full game state update (session, scores, teams, questions, current question) |
-| `timer-update` | Server → Client | Timer tick with seconds and running status |
-| `select-question` | Client → Server | Team selects a question from grid |
-| `question-selected` | Server → All | Question was selected (timer NOT auto-started) |
-| `admin-next-question` | Client → Server | Admin selects next sequential question |
-| `admin-start-timer` | Client → Server | Admin manually starts 30s countdown |
-| `admin-show-answer` | Client → Server | Admin reveals correct answer |
-| `admin-reset-timer` | Client → Server | Admin resets timer to 30s |
+| `game-state` | Server → Client | Full game state (session, scores, teams, questions, phase, turn info, assignments) |
+| `timer-update` | Server → Client | Timer tick with seconds, running status, and phase |
+| `player-select-question` | Client → Server | Player selects a question number from their assigned numbers |
+| `question-selected` | Server → All | Question was selected, includes question data and number |
 | `submit-answer` | Client → Server | Team submits answer |
 | `answer-result` | Server → All | Answer result with correct/incorrect and correct answer |
-| `turn-changed` | Server → All | Next team's turn |
-| `time-up` | Server → All | Timer expired, auto-skip triggered |
-| `admin-start` | Client → Server | Start new game |
+| `turn-changed` | Server → All | Next team/player's turn |
+| `phase-changed` | Server → All | Game phase transition |
+| `team-joined` | Server → All | Team joined during entry phase |
+| `team-completed` | Server → All | Team finished, next team starting |
+| `time-up` | Server → All | Timer expired, auto-action triggered |
+| `admin-start` | Client → Server | Start new game (entry phase) |
+| `admin-skip-entry` | Client → Server | Skip entry phase, start selection |
+| `admin-force-advance` | Client → Server | Force advance to next phase/turn |
 | `admin-pause` | Client → Server | Pause game |
 | `admin-resume` | Client → Server | Resume game |
 | `admin-end` | Client → Server | End game |

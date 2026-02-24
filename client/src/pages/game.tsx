@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { useGameSocket } from "@/lib/useGameSocket";
@@ -20,11 +20,13 @@ import {
   Wifi,
   WifiOff,
   CheckCircle2,
-  BookOpen,
-  ChevronRight,
   Clock,
   XCircle,
   Zap,
+  User,
+  Hash,
+  Eye,
+  BookOpen,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -38,12 +40,12 @@ export default function Game() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [playerTeamId, setPlayerTeamId] = useState<number | null>(null);
+  const [playerName, setPlayerName] = useState<string | null>(null);
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion } = useGameSocket();
-  const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
-  const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
+  const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion, joinTeam } = useGameSocket();
+  const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, currentPlayerAvailableNumbers, usedQuestionNumbers, teamPlayers, entryTeams } = gameState;
+  const currentTeam = teams.find((t) => t.id === currentTeamId);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -60,6 +62,7 @@ export default function Game() {
         const data = await res.json();
         setIsAuthorized(data.valid);
         if (data.teamId) setPlayerTeamId(data.teamId);
+        if (data.playerName || data.name) setPlayerName(data.playerName || data.name);
       } catch {
         setIsAuthorized(false);
       }
@@ -67,6 +70,12 @@ export default function Game() {
     };
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (phase === "entry" && playerTeamId && !entryTeams.includes(playerTeamId)) {
+      joinTeam(playerTeamId);
+    }
+  }, [phase, playerTeamId, entryTeams, joinTeam]);
 
   useEffect(() => {
     if (currentQuestion && currentQuestion.id !== lastQuestionId) {
@@ -98,41 +107,23 @@ export default function Game() {
 
   const handleAnswer = useCallback(
     (answer: string) => {
-      if (!currentQuestion || !session) return;
+      if (!currentQuestion || !session || phase !== "answer") return;
       setSelectedAnswer(answer);
-      submitAnswer(answer, session.id, session.currentTeamId!, currentQuestion.id);
+      submitAnswer(answer, session.id, currentTeamId!, currentQuestion.id);
     },
-    [currentQuestion, session, submitAnswer],
+    [currentQuestion, session, submitAnswer, currentTeamId, phase],
   );
 
-  const handleSelectQuestion = useCallback(
-    (questionId: number) => {
-      if (!session) return;
-      selectQuestion(questionId, session.id);
+  const handleSelectQuestionNumber = useCallback(
+    (questionNumber: number) => {
+      if (!playerTeamId || !playerName || phase !== "selection") return;
+      selectQuestion(questionNumber, playerTeamId, playerName);
     },
-    [session, selectQuestion],
+    [playerTeamId, playerName, phase, selectQuestion],
   );
 
-  const isMyTurn = playerTeamId ? session?.currentTeamId === playerTeamId : true;
-
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    questions.forEach((q) => {
-      const cat = language === "ar" ? q.categoryAr : q.categoryEn;
-      if (cat) cats.add(cat);
-    });
-    return Array.from(cats);
-  }, [questions, language]);
-
-  const filteredQuestions = useMemo(() => {
-    return questions.filter((q) => {
-      if (categoryFilter === "all") return true;
-      const cat = language === "ar" ? q.categoryAr : q.categoryEn;
-      return cat === categoryFilter;
-    });
-  }, [questions, categoryFilter, language]);
-
-  const availableCount = questions.filter((q) => !answeredQuestionIds.includes(q.id)).length;
+  const isMyTurn = playerTeamId === currentTeamId && playerName === currentPlayerName;
+  const isMyTeamTurn = playerTeamId === currentTeamId;
 
   if (!authChecked) {
     return (
@@ -173,7 +164,7 @@ export default function Game() {
     );
   }
 
-  if (!session || session.status === "waiting") {
+  if (phase === "idle" || !session) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] ramadan-gradient relative overflow-hidden">
         <div className="mosque-silhouette opacity-15" />
@@ -210,11 +201,11 @@ export default function Game() {
           <div className="flex items-center justify-center gap-2">
             {connected ? (
               <Badge variant="secondary" className="gap-1 text-emerald-500">
-                <Wifi className="h-3 w-3" /> {t("connected") || "Connected"}
+                <Wifi className="h-3 w-3" /> {t("connected")}
               </Badge>
             ) : (
               <Badge variant="destructive" className="gap-1">
-                <WifiOff className="h-3 w-3" /> {t("reconnecting") || "Reconnecting..."}
+                <WifiOff className="h-3 w-3" /> {t("reconnecting")}
               </Badge>
             )}
           </div>
@@ -232,38 +223,130 @@ export default function Game() {
     );
   }
 
-  if (session?.status === "finished") {
+  if (phase === "entry") {
+    const myTeamJoined = playerTeamId ? entryTeams.includes(playerTeamId) : false;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] ramadan-gradient relative overflow-hidden">
+        <div className="mosque-silhouette opacity-15" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-6 relative z-10 p-6 max-w-md"
+        >
+          <div className="relative w-28 h-28 mx-auto">
+            <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,0.1)" strokeWidth="6" fill="none" />
+              <motion.circle
+                cx="60" cy="60" r="54"
+                stroke="#f59e0b"
+                strokeWidth="6"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 54}
+                animate={{ strokeDashoffset: (2 * Math.PI * 54) - ((timer.seconds / 60) * (2 * Math.PI * 54)) }}
+                transition={{ duration: 0.5, ease: "linear" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-4xl font-bold text-amber-400 tabular-nums" data-testid="text-entry-timer">
+                {timer.seconds}
+              </span>
+            </div>
+          </div>
+
+          <h2 className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-phase">
+            {t("entryPhase")}
+          </h2>
+          <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
+            {t("entryPhaseDesc")}
+          </p>
+
+          {myTeamJoined ? (
+            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 gap-2 text-base px-4 py-2">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("teamJoined")}</span>
+            </Badge>
+          ) : (
+            <Button
+              onClick={() => playerTeamId && joinTeam(playerTeamId)}
+              className="gold-gradient border-amber-400/30 text-white font-bold text-lg px-8 py-3"
+              disabled={!playerTeamId}
+              data-testid="button-join-team"
+            >
+              <Users className="h-5 w-5" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("joinGame")}</span>
+            </Button>
+          )}
+
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <span className="text-xs text-white/50">{t("teamsJoined")}:</span>
+            <span className="text-sm font-bold text-amber-400">{entryTeams.length}/6</span>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (phase === "finished") {
     return null;
   }
+
+  const getPhaseLabel = () => {
+    switch (phase) {
+      case "selection": return t("phaseSelection");
+      case "preparation": return t("phasePreparation");
+      case "answer": return t("phaseAnswer");
+      case "paused": return t("paused");
+      default: return "";
+    }
+  };
+
+  const getPhaseColor = () => {
+    switch (phase) {
+      case "selection": return "bg-blue-500";
+      case "preparation": return "bg-amber-500";
+      case "answer": return "bg-emerald-500";
+      case "paused": return "bg-orange-500";
+      default: return "bg-muted";
+    }
+  };
+
+  const getTimerMax = () => {
+    switch (phase) {
+      case "selection": return 60;
+      case "preparation": return 30;
+      case "answer": return 30;
+      default: return 30;
+    }
+  };
 
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
       <div className="flex items-center justify-between gap-2">
-        {connected ? (
-          <Badge variant="secondary" className="gap-1 text-emerald-500 text-xs">
-            <Wifi className="h-3 w-3" /> {t("live") || "Live"}
-          </Badge>
-        ) : (
-          <Badge variant="destructive" className="gap-1 text-xs">
-            <WifiOff className="h-3 w-3" /> {t("reconnecting") || "Reconnecting..."}
-          </Badge>
-        )}
         <div className="flex items-center gap-2">
-          {session.status === "paused" && (
-            <Badge variant="secondary" className="text-amber-500 gap-1">
-              {t("paused")}
+          {connected ? (
+            <Badge variant="secondary" className="gap-1 text-emerald-500 text-xs">
+              <Wifi className="h-3 w-3" /> {t("live")}
+            </Badge>
+          ) : (
+            <Badge variant="destructive" className="gap-1 text-xs">
+              <WifiOff className="h-3 w-3" /> {t("reconnecting")}
             </Badge>
           )}
-          <Badge variant="outline" className="text-xs gap-1">
-            <BookOpen className="h-3 w-3" />
-            {availableCount} {t("availableCount")} / {answeredQuestionIds.length} {t("answeredCount")}
+          <Badge className={`text-xs gap-1 text-white ${getPhaseColor()}`}>
+            <Clock className="h-3 w-3" />
+            {getPhaseLabel()}
           </Badge>
         </div>
+        <Badge variant="outline" className="text-xs gap-1">
+          <Hash className="h-3 w-3" />
+          {usedQuestionNumbers.length}/{gameState.totalQuestions}
+        </Badge>
       </div>
 
       {currentTeam && (
         <motion.div
-          key={currentTeam.id}
+          key={`${currentTeamId}-${currentPlayerName}`}
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -295,22 +378,24 @@ export default function Game() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <Badge
-                    variant="outline"
-                    className="text-xs gap-1"
-                    style={{ borderColor: currentTeam.color, color: currentTeam.color }}
-                  >
-                    <Crown className="h-3 w-3 text-amber-500" />
-                    {currentTeam.captain}
-                  </Badge>
+                  {currentPlayerName && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <User className="h-3 w-3" />
+                      <span className="font-arabic">{currentPlayerName}</span>
+                    </Badge>
+                  )}
                   {isMyTurn ? (
                     <Badge className="text-xs bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1">
                       <Zap className="h-3 w-3" />
                       {t("yourTurn")}
                     </Badge>
+                  ) : isMyTeamTurn ? (
+                    <Badge variant="secondary" className="text-xs text-blue-600">
+                      {t("teammateTurn")}
+                    </Badge>
                   ) : (
                     <Badge variant="secondary" className="text-xs text-amber-600">
-                      {t("waitingForTurn") || "Waiting for your turn..."}
+                      {t("waitingForTurn")}
                     </Badge>
                   )}
                 </div>
@@ -322,84 +407,72 @@ export default function Game() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
+          <Card className="p-3 md:p-4">
+            <div className="flex items-center gap-4 p-2 rounded-md">
+              <div className="relative w-20 h-20 shrink-0">
+                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="38" stroke="hsl(var(--muted))" strokeWidth="4" fill="none" />
+                  <motion.circle
+                    cx="40" cy="40" r="38"
+                    stroke={timer.seconds > 20 ? "#10b981" : timer.seconds > 10 ? "#f59e0b" : "#ef4444"}
+                    strokeWidth="4"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 38}
+                    animate={{ strokeDashoffset: (2 * Math.PI * 38) - ((timer.seconds / getTimerMax()) * (2 * Math.PI * 38)) }}
+                    transition={{ duration: 0.5, ease: "linear" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span
+                    className={`text-2xl font-bold tabular-nums ${
+                      timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                    } ${timer.seconds <= 5 && timer.running ? "animate-pulse" : ""}`}
+                    data-testid="text-timer"
+                  >
+                    {timer.seconds}
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">{getPhaseLabel()}</span>
+                  <span className={`text-xs font-medium ${
+                    timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                  }`}>
+                    {timer.running
+                      ? (timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut"))
+                      : ""
+                    }
+                  </span>
+                </div>
+                <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
+                  <motion.div
+                    className={`h-full rounded-full transition-colors duration-500 ${
+                      timer.seconds > 20 ? "bg-emerald-500" : timer.seconds > 10 ? "bg-amber-500" : "bg-red-500"
+                    }`}
+                    animate={{ width: `${(timer.seconds / getTimerMax()) * 100}%` }}
+                    transition={{ duration: 0.3, ease: "linear" }}
+                  />
+                </div>
+              </div>
+            </div>
+          </Card>
+
           <AnimatePresence mode="wait">
-            {currentQuestion ? (
+            {phase === "selection" && (
               <motion.div
-                key="question"
+                key="selection"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-4"
               >
-                <Card className="p-3 md:p-4">
-                  <div className="flex items-center gap-4 p-2 rounded-md">
-                    <div className="relative w-20 h-20 shrink-0">
-                      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                        <circle cx="40" cy="40" r="38" stroke="hsl(var(--muted))" strokeWidth="4" fill="none" />
-                        <motion.circle
-                          cx="40" cy="40" r="38"
-                          stroke={timer.seconds > 20 ? "#10b981" : timer.seconds > 10 ? "#f59e0b" : "#ef4444"}
-                          strokeWidth="4"
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeDasharray={2 * Math.PI * 38}
-                          animate={{ strokeDashoffset: (2 * Math.PI * 38) - ((timer.seconds / 30) * (2 * Math.PI * 38)) }}
-                          transition={{ duration: 0.5, ease: "linear" }}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span
-                          className={`text-2xl font-bold tabular-nums ${
-                            timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
-                          } ${timer.seconds <= 5 ? "animate-pulse" : ""}`}
-                          data-testid="text-timer"
-                        >
-                          {timer.seconds}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-muted-foreground">{t("timer")}</span>
-                        <span className={`text-xs font-medium ${
-                          timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
-                        }`}>
-                          {timer.running
-                            ? (timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut"))
-                            : t("waitingForTimer")
-                          }
-                        </span>
-                      </div>
-                      <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
-                        <motion.div
-                          className={`h-full rounded-full transition-colors duration-500 ${
-                            timer.seconds > 20 ? "bg-emerald-500" : timer.seconds > 10 ? "bg-amber-500" : "bg-red-500"
-                          }`}
-                          animate={{ width: `${(timer.seconds / 30) * 100}%` }}
-                          transition={{ duration: 0.3, ease: "linear" }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-                <QuestionDisplay
-                  question={currentQuestion}
-                  questionNumber={questions.findIndex((q) => q.id === currentQuestion.id) + 1}
-                  onAnswer={handleAnswer}
-                  showResult={showResult}
-                  correctAnswer={showResult ? (answerResult?.correctAnswer || currentQuestion.correctAnswer) : null}
-                  disabled={!!selectedAnswer || !isMyTurn || !timer.running}
-                  selectedAnswer={selectedAnswer || (answerResult?.answerGiven || null)}
-                />
-              </motion.div>
-            ) : (
-              <motion.div key="question-select" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Card className="p-4 md:p-5">
                   <div className="flex items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-amber-500" />
+                      <Hash className="h-5 w-5 text-amber-500" />
                       <h3 className={`text-lg font-bold ${isRTL ? "font-arabic" : ""}`} data-testid="text-select-question-title">
-                        {isMyTurn ? t("selectYourQuestion") : t("waitingForQuestion")}
+                        {isMyTurn ? t("selectYourNumber") : t("waitingForSelection")}
                       </h3>
                     </div>
                     {isMyTurn && (
@@ -410,100 +483,109 @@ export default function Game() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                    <Button
-                      size="sm"
-                      variant={categoryFilter === "all" ? "default" : "outline"}
-                      onClick={() => setCategoryFilter("all")}
-                      className="shrink-0 text-xs"
-                      data-testid="button-filter-all"
-                    >
-                      {t("allCategoriesShort")}
-                    </Button>
-                    {categories.map((cat) => (
-                      <Button
-                        key={cat}
-                        size="sm"
-                        variant={categoryFilter === cat ? "default" : "outline"}
-                        onClick={() => setCategoryFilter(cat)}
-                        className={`shrink-0 text-xs ${isRTL ? "font-arabic" : ""}`}
-                        data-testid={`button-filter-${cat}`}
-                      >
-                        {cat}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto" data-testid="question-list">
-                    {filteredQuestions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className={isRTL ? "font-arabic" : ""}>{t("noAvailableQuestions")}</p>
-                      </div>
-                    ) : (
-                      filteredQuestions.map((q, idx) => {
-                        const isAnswered = answeredQuestionIds.includes(q.id);
-                        const questionText = language === "ar" ? q.textAr : q.textEn;
-                        const category = language === "ar" ? q.categoryAr : q.categoryEn;
-                        const globalIdx = questions.findIndex((gq) => gq.id === q.id) + 1;
-
+                  {isMyTurn ? (
+                    <div className="grid grid-cols-3 gap-3" data-testid="question-number-grid">
+                      {currentPlayerAvailableNumbers.map((num) => {
+                        const isUsed = usedQuestionNumbers.includes(num);
                         return (
                           <motion.button
-                            key={q.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.03 }}
-                            onClick={() => !isAnswered && isMyTurn && handleSelectQuestion(q.id)}
-                            disabled={isAnswered || !isMyTurn}
-                            className={`w-full text-start p-3 md:p-4 rounded-lg border-2 transition-all duration-200 ${
-                              isAnswered
-                                ? "bg-muted/30 border-transparent opacity-50 cursor-not-allowed"
-                                : isMyTurn
-                                  ? "bg-card border-border hover:border-amber-400/60 hover:bg-amber-500/5 hover:shadow-md cursor-pointer active:scale-[0.99]"
-                                  : "bg-card border-border opacity-70 cursor-not-allowed"
+                            key={num}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            onClick={() => !isUsed && handleSelectQuestionNumber(num)}
+                            disabled={isUsed}
+                            className={`aspect-square rounded-xl border-2 text-2xl font-bold transition-all ${
+                              isUsed
+                                ? "bg-muted/30 border-transparent opacity-40 cursor-not-allowed text-muted-foreground"
+                                : "bg-card border-amber-400/40 hover:border-amber-400 hover:bg-amber-500/10 hover:shadow-lg cursor-pointer active:scale-95 text-foreground"
                             }`}
-                            data-testid={`button-question-${q.id}`}
+                            data-testid={`button-question-number-${num}`}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-xs font-bold ${
-                                isAnswered
-                                  ? "bg-muted text-muted-foreground"
-                                  : "bg-amber-500/15 text-amber-600"
-                              }`}>
-                                {isAnswered ? (
-                                  <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                  globalIdx
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm md:text-base font-medium leading-relaxed line-clamp-2 ${isRTL ? "font-arabic text-right" : ""}`}>
-                                  {questionText}
-                                </p>
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <Badge variant="secondary" className={`text-[10px] ${isRTL ? "font-arabic" : ""}`}>
-                                    {category}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-[10px]">
-                                    {q.difficulty === "easy" ? t("easy") : q.difficulty === "hard" ? t("hard") : t("medium")}
-                                  </Badge>
-                                  {isAnswered && (
-                                    <Badge variant="secondary" className={`text-[10px] gap-0.5 ${isRTL ? "font-arabic" : ""}`}>
-                                      <CheckCircle2 className="h-2.5 w-2.5" />
-                                      {t("questionAlreadyAnswered")}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              {!isAnswered && isMyTurn && (
-                                <ChevronRight className={`h-5 w-5 text-muted-foreground shrink-0 mt-1 ${isRTL ? "rotate-180" : ""}`} />
-                              )}
-                            </div>
+                            {isUsed ? (
+                              <CheckCircle2 className="h-8 w-8 mx-auto text-muted-foreground" />
+                            ) : (
+                              num
+                            )}
                           </motion.button>
                         );
-                      })
-                    )}
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Eye className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className={`text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                        {isMyTeamTurn
+                          ? `${currentPlayerName} ${t("isSelectingQuestion")}`
+                          : t("waitingForTurn")
+                        }
+                      </p>
+                    </div>
+                  )}
+                </Card>
+              </motion.div>
+            )}
+
+            {phase === "preparation" && currentQuestion && (
+              <motion.div
+                key="preparation"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card className="p-4 md:p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Eye className="h-5 w-5 text-amber-500" />
+                    <h3 className={`text-lg font-bold ${isRTL ? "font-arabic" : ""}`}>
+                      {t("phasePreparation")}
+                    </h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {t("readQuestion")}
+                    </Badge>
                   </div>
+                  <QuestionDisplay
+                    question={currentQuestion}
+                    questionNumber={0}
+                    onAnswer={() => {}}
+                    showResult={null}
+                    correctAnswer={null}
+                    disabled={true}
+                    selectedAnswer={null}
+                  />
+                </Card>
+              </motion.div>
+            )}
+
+            {phase === "answer" && currentQuestion && (
+              <motion.div
+                key="answer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <QuestionDisplay
+                  question={currentQuestion}
+                  questionNumber={0}
+                  onAnswer={handleAnswer}
+                  showResult={showResult}
+                  correctAnswer={showResult ? (answerResult?.correctAnswer || currentQuestion.correctAnswer) : null}
+                  disabled={!!selectedAnswer || !isMyTurn || phase !== "answer"}
+                  selectedAnswer={selectedAnswer || (answerResult?.answerGiven || null)}
+                />
+              </motion.div>
+            )}
+
+            {phase === "paused" && (
+              <motion.div
+                key="paused"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card className="p-8 text-center">
+                  <Clock className="h-12 w-12 mx-auto mb-3 text-amber-500" />
+                  <h3 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>
+                    {t("paused")}
+                  </h3>
                 </Card>
               </motion.div>
             )}
@@ -515,7 +597,7 @@ export default function Game() {
             <Scoreboard
               teams={teams}
               scores={scores}
-              currentTeamId={session.currentTeamId}
+              currentTeamId={currentTeamId}
             />
           </Card>
         </div>

@@ -15,6 +15,10 @@ import {
   XCircle,
   Wifi,
   WifiOff,
+  User,
+  Hash,
+  Clock,
+  Eye,
 } from "lucide-react";
 
 export default function Display() {
@@ -22,8 +26,8 @@ export default function Display() {
   const { isRTL, language } = useLanguage();
   const { gameState, timer, answerResult, teamCompleted, connected } = useGameSocket();
 
-  const { session, scores, teams, questions, currentQuestion, answeredQuestionIds } = gameState;
-  const currentTeam = teams.find((t) => t.id === session?.currentTeamId);
+  const { session, scores, teams, questions, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, entryTeams } = gameState;
+  const currentTeam = teams.find((t) => t.id === currentTeamId);
 
   useEffect(() => {
     document.title = isRTL
@@ -39,6 +43,16 @@ export default function Display() {
 
   const maxScore = Math.max(...sortedTeams.map((t) => scores.find((s) => s.teamId === t.id)?.score || 0), 1);
 
+  const getTimerMax = () => {
+    switch (phase) {
+      case "entry": return 60;
+      case "selection": return 60;
+      case "preparation": return 30;
+      case "answer": return 30;
+      default: return 30;
+    }
+  };
+
   const getTimerColor = () => {
     if (timer.seconds > 20) return "text-emerald-400";
     if (timer.seconds > 10) return "text-amber-400";
@@ -52,7 +66,7 @@ export default function Display() {
   };
 
   const circumference = 2 * Math.PI * 70;
-  const strokeDashoffset = circumference - ((timer.seconds / 30) * circumference);
+  const strokeDashoffset = circumference - ((timer.seconds / getTimerMax()) * circumference);
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Crown className="h-6 w-6 text-amber-400 fill-amber-400" />;
@@ -61,15 +75,38 @@ export default function Display() {
     return null;
   };
 
+  const getPhaseLabel = () => {
+    switch (phase) {
+      case "entry": return t("entryPhase");
+      case "selection": return t("phaseSelection");
+      case "preparation": return t("phasePreparation");
+      case "answer": return t("phaseAnswer");
+      case "paused": return t("paused");
+      case "finished": return t("gameOver");
+      default: return "";
+    }
+  };
+
+  const getPhaseColor = () => {
+    switch (phase) {
+      case "entry": return "bg-purple-500/30 text-purple-300 border-purple-400/30";
+      case "selection": return "bg-blue-500/30 text-blue-300 border-blue-400/30";
+      case "preparation": return "bg-amber-500/30 text-amber-300 border-amber-400/30";
+      case "answer": return "bg-emerald-500/30 text-emerald-300 border-emerald-400/30";
+      case "paused": return "bg-orange-500/30 text-orange-300 border-orange-400/30";
+      default: return "bg-white/10 text-white/60";
+    }
+  };
+
   const connectionBadge = (
     <div className="absolute top-3 left-3 z-20">
       {connected ? (
         <Badge variant="secondary" className="gap-1 text-emerald-400 bg-black/40 border-emerald-500/30">
-          <Wifi className="h-3 w-3" /> {t("connected") || "Live"}
+          <Wifi className="h-3 w-3" /> {t("connected")}
         </Badge>
       ) : (
         <Badge variant="destructive" className="gap-1 bg-red-900/60">
-          <WifiOff className="h-3 w-3" /> {t("disconnected") || "Offline"}
+          <WifiOff className="h-3 w-3" /> {t("disconnected")}
         </Badge>
       )}
     </div>
@@ -85,11 +122,10 @@ export default function Display() {
     </div>
   );
 
-  if (!session || session.status === "waiting" || !session.status) {
+  if (phase === "idle" || !session) {
     return (
       <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
         {connectionBadge}
-
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {[...Array(20)].map((_, i) => (
@@ -119,17 +155,97 @@ export default function Display() {
             </motion.div>
           </motion.div>
         </div>
-
         {bannerSide}
       </div>
     );
   }
 
-  if (session.status === "finished") {
+  if (phase === "entry") {
     return (
       <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
         {connectionBadge}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-8 max-w-2xl"
+          >
+            <Badge className={`text-lg px-4 py-2 ${getPhaseColor()}`}>
+              <Clock className="h-4 w-4 mr-2" />
+              {t("entryPhase")}
+            </Badge>
 
+            <div className="relative w-36 h-36 mx-auto">
+              <svg className="w-36 h-36 -rotate-90" viewBox="0 0 160 160">
+                <circle cx="80" cy="80" r="70" stroke="rgba(255,255,255,0.1)" strokeWidth="8" fill="none" />
+                <motion.circle
+                  cx="80" cy="80" r="70"
+                  stroke="#f59e0b"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  animate={{ strokeDashoffset: circumference - ((timer.seconds / 60) * circumference) }}
+                  transition={{ duration: 0.5, ease: "linear" }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-5xl font-bold text-amber-400 tabular-nums" data-testid="display-entry-timer">
+                  {timer.seconds}
+                </span>
+              </div>
+            </div>
+
+            <h1 className={`text-4xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}>
+              {t("entryPhaseDesc")}
+            </h1>
+
+            <div className="grid grid-cols-3 gap-4">
+              {teams.map((team) => {
+                const joined = entryTeams.includes(team.id);
+                return (
+                  <motion.div
+                    key={team.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`p-4 rounded-xl backdrop-blur-sm border-2 transition-all ${
+                      joined
+                        ? "bg-emerald-500/15 border-emerald-400/40"
+                        : "bg-white/5 border-white/10"
+                    }`}
+                    data-testid={`display-entry-team-${team.id}`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 rounded-full" style={{ backgroundColor: team.color }} />
+                      <span className={`text-sm font-bold text-white truncate ${isRTL ? "font-arabic" : ""}`}>
+                        {language === "ar" ? team.nameAr : team.nameEn}
+                      </span>
+                    </div>
+                    {joined ? (
+                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        {t("joined")}
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-white/10 text-white/40 border-white/10 text-xs">
+                        {t("waiting")}
+                      </Badge>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
+        {bannerSide}
+      </div>
+    );
+  }
+
+  if (phase === "finished" || session.status === "finished") {
+    return (
+      <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+        {connectionBadge}
         <div className="flex-1 flex flex-col relative z-10 overflow-hidden px-6 py-5">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2 shrink-0 mb-5">
             <div className="flex items-center justify-center gap-4">
@@ -139,7 +255,6 @@ export default function Display() {
               </h1>
             </div>
           </motion.div>
-
           <div className="flex-1 overflow-auto space-y-3 max-w-4xl mx-auto w-full">
             {sortedTeams.map((team, index) => {
               const teamScore = scores.find((s) => s.teamId === team.id);
@@ -177,7 +292,6 @@ export default function Display() {
             })}
           </div>
         </div>
-
         {bannerSide}
       </div>
     );
@@ -199,10 +313,6 @@ export default function Display() {
   const category = currentQuestion
     ? language === "ar" ? currentQuestion.categoryAr : currentQuestion.categoryEn
     : "";
-
-  const questionNumber = currentQuestion
-    ? questions.findIndex((q) => q.id === currentQuestion.id) + 1
-    : 0;
 
   const getOptionDisplayStyle = (key: string) => {
     if (!answerResult) return "bg-white/8 border-white/15 text-white";
@@ -234,12 +344,21 @@ export default function Display() {
                   {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
                 </h2>
               </div>
+              {currentPlayerName && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/15">
+                  <User className="h-3.5 w-3.5 text-amber-300" />
+                  <span className="text-sm font-medium text-white font-arabic">{currentPlayerName}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
+              <Badge className={`text-sm px-3 py-1 ${getPhaseColor()}`}>
+                {getPhaseLabel()}
+              </Badge>
               <div className="text-right">
                 <span className="text-xs text-white/40">{t("questions")}</span>
-                <p className="text-base font-bold text-amber-300">{answeredQuestionIds.length}/{questions.length}</p>
+                <p className="text-base font-bold text-amber-300">{usedQuestionNumbers.length}/{gameState.totalQuestions}</p>
               </div>
             </div>
           </div>
@@ -248,7 +367,48 @@ export default function Display() {
         <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <AnimatePresence mode="wait">
-              {currentQuestion ? (
+              {phase === "selection" && (
+                <motion.div
+                  key="display-selection"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="flex-1 flex flex-col items-center justify-center gap-6"
+                >
+                  <div className="relative w-28 h-28 shrink-0">
+                    <svg className="w-28 h-28 -rotate-90" viewBox="0 0 160 160">
+                      <circle cx="80" cy="80" r="70" stroke="rgba(255,255,255,0.1)" strokeWidth="8" fill="none" />
+                      <motion.circle
+                        cx="80" cy="80" r="70"
+                        stroke={getTimerStroke()}
+                        strokeWidth="8"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        animate={{ strokeDashoffset }}
+                        transition={{ duration: 0.5, ease: "linear" }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-4xl font-bold tabular-nums ${getTimerColor()}`} data-testid="display-timer">
+                        {timer.seconds}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/8 backdrop-blur-sm border border-white/10">
+                    <Hash className="h-10 w-10 text-blue-400" />
+                    <p className={`text-2xl text-white font-bold ${isRTL ? "font-arabic" : ""}`}>
+                      {t("phaseSelection")}
+                    </p>
+                    <p className={`text-lg text-white/60 ${isRTL ? "font-arabic" : ""}`}>
+                      {currentPlayerName} {t("isSelectingQuestion")}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {(phase === "preparation" || phase === "answer") && currentQuestion ? (
                 <motion.div
                   key={`q-${currentQuestion.id}`}
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -258,13 +418,15 @@ export default function Display() {
                 >
                   <div className="flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 gap-1 text-sm px-3 py-1">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                        {t("questionNumber")}{questionNumber}
+                      <Badge className={`gap-1 text-sm px-3 py-1 ${getPhaseColor()}`}>
+                        {phase === "preparation" ? <Eye className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        {getPhaseLabel()}
                       </Badge>
-                      <Badge className="bg-white/10 text-white/80 border-white/15 text-sm px-2.5 py-1">
-                        {category}
-                      </Badge>
+                      {category && (
+                        <Badge className="bg-white/10 text-white/80 border-white/15 text-sm px-2.5 py-1">
+                          {category}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="relative w-20 h-20 shrink-0">
@@ -307,41 +469,52 @@ export default function Display() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 shrink-0">
-                    {options.map((option, idx) => (
-                      <motion.div
-                        key={option.key}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-300 ${getOptionDisplayStyle(option.key)}`}
-                        data-testid={`display-option-${option.key}`}
-                      >
-                        <span className={`flex items-center justify-center w-10 h-10 rounded-full text-base font-bold shrink-0 ${
-                          answerResult && option.key === answerResult.correctAnswer
-                            ? "bg-emerald-500 text-white"
-                            : answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect
-                              ? "bg-red-500 text-white"
-                              : "bg-white/10 text-white"
-                        }`}>
-                          {option.key.toUpperCase()}
-                        </span>
-                        <span className={`flex-1 text-base md:text-lg font-medium ${isRTL ? "font-arabic" : ""}`}>
-                          {option.text}
-                        </span>
-                        {answerResult && option.key === answerResult.correctAnswer && (
-                          <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}>
-                            <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
-                          </motion.div>
-                        )}
-                        {answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect && (
-                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
-                            <XCircle className="h-8 w-8 text-red-400 shrink-0" />
-                          </motion.div>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
+                  {phase === "answer" && (
+                    <div className="grid grid-cols-2 gap-2.5 shrink-0">
+                      {options.map((option, idx) => (
+                        <motion.div
+                          key={option.key}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-300 ${getOptionDisplayStyle(option.key)}`}
+                          data-testid={`display-option-${option.key}`}
+                        >
+                          <span className={`flex items-center justify-center w-10 h-10 rounded-full text-base font-bold shrink-0 ${
+                            answerResult && option.key === answerResult.correctAnswer
+                              ? "bg-emerald-500 text-white"
+                              : answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect
+                                ? "bg-red-500 text-white"
+                                : "bg-white/10 text-white"
+                          }`}>
+                            {option.key.toUpperCase()}
+                          </span>
+                          <span className={`flex-1 text-base md:text-lg font-medium ${isRTL ? "font-arabic" : ""}`}>
+                            {option.text}
+                          </span>
+                          {answerResult && option.key === answerResult.correctAnswer && (
+                            <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}>
+                              <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
+                            </motion.div>
+                          )}
+                          {answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect && (
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
+                              <XCircle className="h-8 w-8 text-red-400 shrink-0" />
+                            </motion.div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+
+                  {phase === "preparation" && (
+                    <div className="flex items-center justify-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-400/20 shrink-0">
+                      <Eye className="h-6 w-6 text-amber-400" />
+                      <span className={`text-xl text-amber-200 font-medium ${isRTL ? "font-arabic" : ""}`}>
+                        {t("readQuestion")}
+                      </span>
+                    </div>
+                  )}
 
                   <AnimatePresence>
                     {answerResult && (
@@ -377,7 +550,7 @@ export default function Display() {
                     )}
                   </AnimatePresence>
                 </motion.div>
-              ) : (
+              ) : (phase !== "selection" && phase !== "entry") && (
                 <motion.div
                   key="waiting-question"
                   initial={{ opacity: 0 }}
@@ -403,16 +576,6 @@ export default function Display() {
                           : ""}{" "}
                         {t("teamCompletedMoving")}
                       </p>
-                      <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10">
-                        <div className="w-5 h-5 rounded-full" style={{ backgroundColor: teams.find(t => t.id === teamCompleted.nextTeamId)?.color }} />
-                        <span className={`text-xl md:text-2xl text-white font-bold ${isRTL ? "font-arabic" : ""}`}>
-                          {teams.find(t => t.id === teamCompleted.nextTeamId)
-                            ? language === "ar"
-                              ? teams.find(t => t.id === teamCompleted.nextTeamId)!.nameAr
-                              : teams.find(t => t.id === teamCompleted.nextTeamId)!.nameEn
-                            : ""}
-                        </span>
-                      </div>
                     </motion.div>
                   ) : (
                     <>
@@ -420,17 +583,9 @@ export default function Display() {
                         <Sparkles className="h-16 w-16 text-amber-400/40" />
                       </motion.div>
                       <p className={`text-2xl text-white/50 font-medium ${isRTL ? "font-arabic" : ""}`} data-testid="display-waiting-selection">
-                        {t("waitingForAdmin") || "Waiting for the next question..."}
+                        {t("waitingForAdmin")}
                       </p>
                     </>
-                  )}
-                  {currentTeam && !teamCompleted && (
-                    <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/8 border border-white/10">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: currentTeam.color }} />
-                      <span className={`text-lg text-white font-medium ${isRTL ? "font-arabic" : ""}`}>
-                        {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
-                      </span>
-                    </div>
                   )}
                 </motion.div>
               )}
@@ -448,7 +603,7 @@ export default function Display() {
             <div className="space-y-2 flex-1 overflow-auto">
               {sortedTeams.map((team, index) => {
                 const teamScore = scores.find((s) => s.teamId === team.id);
-                const isCurrent = session?.currentTeamId === team.id;
+                const isCurrent = currentTeamId === team.id;
                 const score = teamScore?.score || 0;
                 const barWidth = maxScore > 0 ? (score / maxScore) * 100 : 0;
 
@@ -486,7 +641,7 @@ export default function Display() {
                         className="h-full rounded-full"
                         style={{ backgroundColor: team.color }}
                         animate={{ width: `${barWidth}%` }}
-                        transition={{ duration: 0.6 }}
+                        transition={{ duration: 0.5 }}
                       />
                     </div>
                   </motion.div>

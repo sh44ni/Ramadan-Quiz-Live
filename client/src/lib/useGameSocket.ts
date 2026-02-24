@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
 
+export type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "finished";
+
 export interface GameState {
   session: GameSession | null;
   scores: TeamScore[];
@@ -9,11 +11,24 @@ export interface GameState {
   questions: Question[];
   currentQuestion: Question | null;
   timerSeconds: number;
+  phase: GamePhase;
+  currentTeamId: number | null;
+  currentPlayerName: string | null;
+  currentPlayerAvailableNumbers: number[];
+  usedQuestionNumbers: number[];
+  teamPlayers: Record<number, string[]>;
+  playerAssignments: Record<string, number[]>;
+  entryTeams: number[];
+  totalQuestions: number;
+  currentTeamIndex: number;
+  currentPlayerIndex: number;
+  teamOrder: number[];
 }
 
 interface TimerState {
   seconds: number;
   running: boolean;
+  phase: GamePhase;
 }
 
 interface AnswerResult {
@@ -21,6 +36,7 @@ interface AnswerResult {
   correctAnswer: string;
   answerGiven: string;
   teamId: number;
+  timeUp?: boolean;
 }
 
 interface TeamCompletedEvent {
@@ -28,17 +44,31 @@ interface TeamCompletedEvent {
   nextTeamId: number;
 }
 
+const defaultState: GameState = {
+  session: null,
+  scores: [],
+  answeredQuestionIds: [],
+  teams: [],
+  questions: [],
+  currentQuestion: null,
+  timerSeconds: 0,
+  phase: "idle",
+  currentTeamId: null,
+  currentPlayerName: null,
+  currentPlayerAvailableNumbers: [],
+  usedQuestionNumbers: [],
+  teamPlayers: {},
+  playerAssignments: {},
+  entryTeams: [],
+  totalQuestions: 31,
+  currentTeamIndex: 0,
+  currentPlayerIndex: 0,
+  teamOrder: [],
+};
+
 export function useGameSocket() {
-  const [gameState, setGameState] = useState<GameState>({
-    session: null,
-    scores: [],
-    answeredQuestionIds: [],
-    teams: [],
-    questions: [],
-    currentQuestion: null,
-    timerSeconds: 30,
-  });
-  const [timer, setTimer] = useState<TimerState>({ seconds: 30, running: false });
+  const [gameState, setGameState] = useState<GameState>(defaultState);
+  const [timer, setTimer] = useState<TimerState>({ seconds: 0, running: false, phase: "idle" });
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
   const [teamCompleted, setTeamCompleted] = useState<TeamCompletedEvent | null>(null);
   const [connected, setConnected] = useState(false);
@@ -65,7 +95,7 @@ export function useGameSocket() {
             setGameState(msg.data);
             break;
           case "timer-update":
-            setTimer({ seconds: msg.seconds, running: msg.running });
+            setTimer({ seconds: msg.seconds, running: msg.running, phase: msg.phase || "idle" });
             break;
           case "answer-result":
             setAnswerResult(msg);
@@ -80,7 +110,7 @@ export function useGameSocket() {
             if (msg.teamId) {
               setGameState((prev) => ({
                 ...prev,
-                session: prev.session ? { ...prev.session, currentTeamId: msg.teamId } : prev.session,
+                currentTeamId: msg.teamId,
                 currentQuestion: null,
               }));
             }
@@ -89,15 +119,23 @@ export function useGameSocket() {
             setTeamCompleted({ completedTeamId: msg.completedTeamId, nextTeamId: msg.nextTeamId });
             setTimeout(() => setTeamCompleted(null), 5000);
             break;
-          case "game-started":
+          case "phase-changed":
+            setGameState((prev) => ({ ...prev, phase: msg.phase }));
+            break;
+          case "team-joined":
             setGameState((prev) => ({
               ...prev,
-              session: prev.session ? { ...prev.session, status: "active" } : prev.session,
+              entryTeams: prev.entryTeams.includes(msg.teamId) ? prev.entryTeams : [...prev.entryTeams, msg.teamId],
             }));
+            break;
+          case "entry-closed":
+            break;
+          case "game-started":
             break;
           case "game-paused":
             setGameState((prev) => ({
               ...prev,
+              phase: "paused",
               session: prev.session ? { ...prev.session, status: "paused" } : prev.session,
             }));
             break;
@@ -110,23 +148,18 @@ export function useGameSocket() {
           case "game-finished":
             setGameState((prev) => ({
               ...prev,
+              phase: "finished",
               session: prev.session ? { ...prev.session, status: "finished" } : prev.session,
               currentQuestion: null,
             }));
             break;
           case "game-reset":
-            setGameState((prev) => ({
-              ...prev,
-              session: null,
-              scores: [],
-              answeredQuestionIds: [],
-              currentQuestion: null,
-            }));
+            setGameState({ ...defaultState });
             setAnswerResult(null);
             setTeamCompleted(null);
             break;
           case "time-up":
-            setTimer({ seconds: 0, running: false });
+            setTimer((prev) => ({ ...prev, seconds: 0, running: false }));
             break;
         }
       } catch (e) {
@@ -160,12 +193,16 @@ export function useGameSocket() {
     }
   }, []);
 
-  const selectQuestion = useCallback((questionId: number, sessionId: number) => {
-    send({ type: "select-question", questionId, sessionId });
+  const selectQuestion = useCallback((questionNumber: number, teamId: number, playerName: string) => {
+    send({ type: "player-select-question", questionNumber, teamId, playerName });
   }, [send]);
 
   const submitAnswer = useCallback((answer: string, sessionId: number, teamId: number, questionId: number) => {
     send({ type: "submit-answer", answer, sessionId, teamId, questionId });
+  }, [send]);
+
+  const joinTeam = useCallback((teamId: number) => {
+    send({ type: "team-join", teamId });
   }, [send]);
 
   const adminStart = useCallback(() => send({ type: "admin-start" }), [send]);
@@ -174,13 +211,10 @@ export function useGameSocket() {
   const adminEnd = useCallback(() => send({ type: "admin-end" }), [send]);
   const adminReset = useCallback(() => send({ type: "admin-reset" }), [send]);
   const adminSkip = useCallback(() => send({ type: "admin-skip" }), [send]);
+  const adminSkipEntry = useCallback(() => send({ type: "admin-skip-entry" }), [send]);
   const adminSetTeam = useCallback((teamId: number) => send({ type: "admin-set-team", teamId }), [send]);
   const adminAdjustScore = useCallback((teamId: number, points: number) => send({ type: "admin-adjust-score", teamId, points }), [send]);
-  const adminNextQuestion = useCallback(() => send({ type: "admin-next-question" }), [send]);
-  const adminSelectSpecificQuestion = useCallback((questionId: number) => send({ type: "admin-select-specific-question", questionId }), [send]);
-  const adminStartTimer = useCallback(() => send({ type: "admin-start-timer" }), [send]);
-  const adminShowAnswer = useCallback(() => send({ type: "admin-show-answer" }), [send]);
-  const adminResetTimer = useCallback(() => send({ type: "admin-reset-timer" }), [send]);
+  const adminForceAdvance = useCallback(() => send({ type: "admin-force-advance" }), [send]);
 
   return {
     gameState,
@@ -190,18 +224,16 @@ export function useGameSocket() {
     connected,
     selectQuestion,
     submitAnswer,
+    joinTeam,
     adminStart,
     adminPause,
     adminResume,
     adminEnd,
     adminReset,
     adminSkip,
+    adminSkipEntry,
     adminSetTeam,
     adminAdjustScore,
-    adminNextQuestion,
-    adminSelectSpecificQuestion,
-    adminStartTimer,
-    adminShowAnswer,
-    adminResetTimer,
+    adminForceAdvance,
   };
 }

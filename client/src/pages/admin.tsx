@@ -92,14 +92,10 @@ export default function Admin() {
     adminResume,
     adminEnd,
     adminReset,
-    adminSkip,
+    adminSkipEntry,
     adminSetTeam,
     adminAdjustScore,
-    adminNextQuestion,
-    adminStartTimer,
-    adminShowAnswer,
-    adminResetTimer,
-    adminSelectSpecificQuestion,
+    adminForceAdvance,
   } = useGameSocket();
 
   const [qbSearch, setQbSearch] = useState("");
@@ -122,9 +118,6 @@ export default function Admin() {
   const [catFormNameAr, setCatFormNameAr] = useState("");
   const [catFormColor, setCatFormColor] = useState("#6B7280");
   const [showCatManager, setShowCatManager] = useState(false);
-  const [msExpanded, setMsExpanded] = useState(true);
-  const [msCategoryFilter, setMsCategoryFilter] = useState("all");
-  const [msDifficultyFilter, setMsDifficultyFilter] = useState("all");
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -291,15 +284,6 @@ export default function Admin() {
     },
   });
 
-  const skipMutation = useMutation({
-    mutationFn: async () => {
-      const res = await adminFetch("POST", "/api/game/skip");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
-    },
-  });
 
   const addEmailMutation = useMutation({
     mutationFn: async () => {
@@ -458,11 +442,14 @@ export default function Admin() {
   const teams = teamsData || wsGameState.teams || [];
   const authorizedEmails = authorizedEmailsData || [];
   const allQuestions = questionsData || wsGameState.questions || [];
-  const totalQuestions = allQuestions.length || 36;
+  const totalQuestions = wsGameState.totalQuestions || allQuestions.length || 31;
+  const usedQuestionNumbers = wsGameState.usedQuestionNumbers || [];
   const answeredQuestionIds = wsGameState.answeredQuestionIds || [];
-  const answeredCount = answeredQuestionIds.length;
+  const answeredCount = usedQuestionNumbers.length;
   const currentQuestion = wsGameState.currentQuestion;
-  const currentTeam = teams.find((t: Team) => t.id === session?.currentTeamId);
+  const currentTeam = teams.find((t: Team) => t.id === wsGameState.currentTeamId);
+  const currentPlayerName = wsGameState.currentPlayerName;
+  const gamePhase = wsGameState.phase;
 
   const isLoading = teamsLoading;
 
@@ -478,23 +465,28 @@ export default function Admin() {
     );
   }
 
+  const phaseLabel = (() => {
+    switch (gamePhase) {
+      case "entry": return t("entryPhase");
+      case "selection": return t("phaseSelection");
+      case "preparation": return t("phasePreparation");
+      case "answer": return t("phaseAnswer");
+      case "paused": return t("paused");
+      case "finished": return t("finished");
+      default: return t("waiting");
+    }
+  })();
+
   const statusColor =
-    session?.status === "active"
+    gamePhase === "selection" || gamePhase === "preparation" || gamePhase === "answer" || gamePhase === "entry"
       ? "bg-emerald-500"
-      : session?.status === "paused"
+      : gamePhase === "paused"
         ? "bg-amber-500"
-        : session?.status === "finished"
+        : gamePhase === "finished"
           ? "bg-red-500"
           : "bg-muted-foreground";
 
-  const statusText =
-    session?.status === "active"
-      ? t("active")
-      : session?.status === "paused"
-        ? t("paused")
-        : session?.status === "finished"
-          ? t("finished")
-          : t("waiting");
+  const statusText = phaseLabel;
 
   const getTeamName = (teamId: number) => {
     const team = teams.find((t: Team) => t.id === teamId);
@@ -502,14 +494,6 @@ export default function Admin() {
     return language === "ar" ? team.nameAr : team.nameEn;
   };
 
-  const nextUnansweredQuestion = allQuestions.find((q: any) => !answeredQuestionIds.includes(q.id));
-  const questionIndex = currentQuestion
-    ? allQuestions.findIndex((q: any) => q.id === currentQuestion.id) + 1
-    : 0;
-
-  const currentTeamQuestionsAnswered = session && currentTeam
-    ? scores.find((s: TeamScore) => s.teamId === currentTeam.id)?.questionsAnswered || 0
-    : 0;
 
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
@@ -590,8 +574,40 @@ export default function Admin() {
             {t("gameControls")}
           </h3>
 
+          {gamePhase !== "idle" && gamePhase !== "finished" && (
+            <div className="p-3 rounded-md bg-muted/30 space-y-2 mb-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("currentPhase")}</span>
+                <Badge className={`text-xs ${
+                  gamePhase === "entry" ? "bg-purple-500/15 text-purple-600" :
+                  gamePhase === "selection" ? "bg-blue-500/15 text-blue-600" :
+                  gamePhase === "preparation" ? "bg-amber-500/15 text-amber-600" :
+                  gamePhase === "answer" ? "bg-emerald-500/15 text-emerald-600" :
+                  "bg-orange-500/15 text-orange-600"
+                }`}>{phaseLabel}</Badge>
+              </div>
+              {currentTeam && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: currentTeam.color }} />
+                  <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
+                    {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
+                  </span>
+                  {currentPlayerName && (
+                    <Badge variant="outline" className="text-xs font-arabic">{currentPlayerName}</Badge>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Timer className="h-3 w-3" />
+                <span className="tabular-nums font-bold">{wsTimer.seconds}s</span>
+                <span>|</span>
+                <span>{answeredCount}/{totalQuestions} {t("questions")}</span>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
-            {(!session || session.status === "waiting" || session.status === "finished") && (
+            {(gamePhase === "idle" || gamePhase === "finished") && (
               <Button
                 onClick={() => { adminStart(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
                 className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold"
@@ -602,10 +618,22 @@ export default function Admin() {
               </Button>
             )}
 
-            {session?.status === "active" && (
+            {gamePhase === "entry" && (
+              <Button
+                onClick={() => { adminSkipEntry(); }}
+                className="col-span-2"
+                variant="secondary"
+                data-testid="button-skip-entry"
+              >
+                <SkipForward className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("skipEntry")}</span>
+              </Button>
+            )}
+
+            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "entry" && (
               <Button
                 variant="secondary"
-                onClick={() => { adminPause(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                onClick={() => { adminPause(); }}
                 data-testid="button-pause"
               >
                 <Pause className="h-4 w-4" />
@@ -613,9 +641,9 @@ export default function Admin() {
               </Button>
             )}
 
-            {session?.status === "paused" && (
+            {gamePhase === "paused" && (
               <Button
-                onClick={() => { adminResume(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                onClick={() => { adminResume(); }}
                 data-testid="button-resume"
               >
                 <Play className="h-4 w-4" />
@@ -623,19 +651,19 @@ export default function Admin() {
               </Button>
             )}
 
-            {session && session.status !== "waiting" && session.status !== "finished" && (
+            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "entry" && (
               <>
                 <Button
                   variant="secondary"
-                  onClick={() => { adminSkip(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
-                  data-testid="button-skip"
+                  onClick={() => { adminForceAdvance(); }}
+                  data-testid="button-force-advance"
                 >
                   <SkipForward className="h-4 w-4" />
-                  <span className={isRTL ? "font-arabic" : ""}>{t("nextTeam")}</span>
+                  <span className={isRTL ? "font-arabic" : ""}>{t("skipQuestion")}</span>
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => { adminEnd(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                  onClick={() => { adminEnd(); }}
                   data-testid="button-end"
                 >
                   <Square className="h-4 w-4" />
@@ -644,42 +672,20 @@ export default function Admin() {
               </>
             )}
 
-            <Button
-              variant="outline"
-              onClick={() => { adminReset(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
-              className={session && session.status !== "waiting" ? "" : "col-span-2"}
-              data-testid="button-reset"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
-            </Button>
+            {gamePhase !== "idle" && (
+              <Button
+                variant="outline"
+                onClick={() => { adminReset(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                data-testid="button-reset"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
+              </Button>
+            )}
           </div>
-
-          {session && session.status === "active" && teams.length > 0 && (
-            <div className="space-y-2 pt-2 border-t">
-              <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                {t("setCurrentTeam") || "Set Current Team"}
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {teams.map((team: Team) => (
-                  <Button
-                    key={team.id}
-                    size="sm"
-                    variant={session.currentTeamId === team.id ? "default" : "outline"}
-                    onClick={() => { adminSetTeam(team.id); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
-                    className="text-xs"
-                    data-testid={`button-set-team-${team.id}`}
-                  >
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
-                    <span className={isRTL ? "font-arabic" : ""}>{language === "ar" ? team.nameAr : team.nameEn}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
         </Card>
 
-        {session && (session.status === "active" || session.status === "paused") && (
+        {session && gamePhase !== "idle" && gamePhase !== "finished" && (
           <Card className="p-4 space-y-4 ring-2 ring-amber-500/30">
             <h3
               className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
@@ -696,9 +702,9 @@ export default function Admin() {
                 <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
                   {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
                 </span>
-                <Badge variant="secondary" className="text-xs ms-auto">
-                  {currentTeamQuestionsAnswered}/5 {t("questions")}
-                </Badge>
+                {currentPlayerName && (
+                  <Badge variant="outline" className="text-xs ms-auto font-arabic">{currentPlayerName}</Badge>
+                )}
               </div>
             )}
 
@@ -720,13 +726,10 @@ export default function Admin() {
               <div className="space-y-3">
                 <div className="p-3 rounded-md bg-primary/5 border border-primary/10">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <Sparkles className="h-3 w-3 text-amber-500" />
-                      {t("questionNumber")}{questionIndex}
-                    </Badge>
                     <Badge variant="secondary" className="text-xs">
                       {language === "ar" ? currentQuestion.categoryAr : currentQuestion.categoryEn}
                     </Badge>
+                    <Badge variant="outline" className="text-xs">{currentQuestion.difficulty}</Badge>
                   </div>
                   <p className={`text-sm font-medium leading-relaxed ${isRTL ? "font-arabic text-right" : ""}`} data-testid="text-admin-question">
                     {language === "ar" ? currentQuestion.textAr : currentQuestion.textEn}
@@ -736,133 +739,12 @@ export default function Admin() {
                     <span className="font-bold text-emerald-600">{currentQuestion.correctAnswer.toUpperCase()}</span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-amber-500" />
-                    <span className={`text-lg font-bold tabular-nums ${
-                      wsTimer.seconds > 20 ? "text-emerald-500" : wsTimer.seconds > 10 ? "text-amber-500" : "text-red-500"
-                    }`}>
-                      {wsTimer.seconds}s
-                    </span>
-                  </div>
-                  <Badge variant={wsTimer.running ? "default" : "secondary"} className="text-xs">
-                    {wsTimer.running ? t("timerRunning") : t("timerStopped")}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={() => adminStartTimer()}
-                    disabled={wsTimer.running}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    data-testid="button-start-timer"
-                  >
-                    <Play className="h-4 w-4" />
-                    <span className={isRTL ? "font-arabic" : ""}>{t("startTimer")}</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => adminResetTimer()}
-                    data-testid="button-reset-timer"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    <span className={isRTL ? "font-arabic" : ""}>{t("resetTimer")}</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => adminShowAnswer()}
-                    className="col-span-2"
-                    data-testid="button-show-answer"
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span className={isRTL ? "font-arabic" : ""}>{t("showAnswer")}</span>
-                  </Button>
-                </div>
               </div>
             ) : (
               <div className="space-y-3">
-                <Button
-                  onClick={() => adminNextQuestion()}
-                  disabled={!nextUnansweredQuestion || !!wsTeamCompleted}
-                  className="w-full gold-gradient border-amber-400/30 text-white font-bold"
-                  data-testid="button-next-question"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  <span className={isRTL ? "font-arabic" : ""}>{t("nextQuestion")}</span>
-                </Button>
-
-                <div className="border-t pt-3">
-                  <button
-                    onClick={() => setMsExpanded(!msExpanded)}
-                    className="flex items-center justify-between gap-2 w-full text-left"
-                    data-testid="button-toggle-manual-select"
-                  >
-                    <span className={`text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 ${isRTL ? "font-arabic" : ""}`}>
-                      <List className="h-3.5 w-3.5" />
-                      {t("selectQuestionForTeam")}
-                    </span>
-                    {msExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-
-                  {msExpanded && (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex gap-2 flex-wrap">
-                        <Select value={msCategoryFilter} onValueChange={setMsCategoryFilter}>
-                          <SelectTrigger className="flex-1 min-w-[120px]" data-testid="select-ms-category">
-                            <SelectValue placeholder={t("filterByCategory")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">{t("allCategories")}</SelectItem>
-                            {(categoriesData || []).map((cat: Category) => (
-                              <SelectItem key={cat.id} value={cat.nameEn}>{language === "ar" ? cat.nameAr : cat.nameEn}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={msDifficultyFilter} onValueChange={setMsDifficultyFilter}>
-                          <SelectTrigger className="flex-1 min-w-[100px]" data-testid="select-ms-difficulty">
-                            <SelectValue placeholder={t("filterByDifficulty")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">{t("allDifficulties")}</SelectItem>
-                            <SelectItem value="easy">{t("easy")}</SelectItem>
-                            <SelectItem value="medium">{t("medium")}</SelectItem>
-                            <SelectItem value="hard">{t("hard")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-1">
-                        {allQuestions
-                          .filter((q: Question) => msCategoryFilter === "all" || q.categoryEn === msCategoryFilter)
-                          .filter((q: Question) => msDifficultyFilter === "all" || q.difficulty === msDifficultyFilter)
-                          .map((q: Question) => {
-                            const isUsed = answeredQuestionIds.includes(q.id);
-                            return (
-                              <button
-                                key={q.id}
-                                onClick={() => adminSelectSpecificQuestion(q.id)}
-                                className={`w-full text-left p-2 rounded-md text-xs flex items-start gap-2 hover-elevate ${
-                                  isUsed ? "opacity-50 bg-muted/20" : "bg-muted/30"
-                                }`}
-                                data-testid={`button-select-question-${q.id}`}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <p className={`font-medium truncate ${isRTL ? "font-arabic text-right" : ""}`}>
-                                    {language === "ar" ? q.textAr : q.textEn}
-                                  </p>
-                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                    <Badge variant="secondary" className="text-[9px]">{language === "ar" ? q.categoryAr : q.categoryEn}</Badge>
-                                    <Badge variant="outline" className="text-[9px]">{q.difficulty}</Badge>
-                                    {isUsed && <Badge variant="destructive" className="text-[9px]">{t("usedQuestions")}</Badge>}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>
+                  {gamePhase === "selection" ? t("waitingForSelection") : t("waitingForAdmin")}
+                </p>
               </div>
             )}
 
@@ -886,14 +768,8 @@ export default function Admin() {
           </Card>
         )}
 
-        {!(session && (session.status === "active" || session.status === "paused")) && (
-          <Card className="p-4">
-            <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} compact />
-          </Card>
-        )}
-
         <Card className="p-4">
-          <Scoreboard teams={teams} scores={scores} currentTeamId={session?.currentTeamId || null} compact />
+          <Scoreboard teams={teams} scores={scores} currentTeamId={wsGameState.currentTeamId || null} compact />
         </Card>
 
         <Card className="p-4 space-y-3 lg:col-span-2">
