@@ -55,14 +55,14 @@ export default function Display() {
   const strokeDashoffset = circumference - ((timer.seconds / 30) * circumference);
 
   const getRankIcon = (index: number) => {
-    if (index === 0) return <Crown className="h-7 w-7 text-amber-400 fill-amber-400" />;
-    if (index === 1) return <Star className="h-6 w-6 text-gray-300 fill-gray-300" />;
-    if (index === 2) return <Star className="h-6 w-6 text-amber-600 fill-amber-600" />;
+    if (index === 0) return <Crown className="h-6 w-6 text-amber-400 fill-amber-400" />;
+    if (index === 1) return <Star className="h-5 w-5 text-gray-300 fill-gray-300" />;
+    if (index === 2) return <Star className="h-5 w-5 text-amber-600 fill-amber-600" />;
     return null;
   };
 
   const connectionBadge = (
-    <div className="absolute top-3 right-3 z-20">
+    <div className="absolute top-3 left-3 z-20">
       {connected ? (
         <Badge variant="secondary" className="gap-1 text-emerald-400 bg-black/40 border-emerald-500/30">
           <Wifi className="h-3 w-3" /> {t("connected") || "Live"}
@@ -75,22 +75,20 @@ export default function Display() {
     </div>
   );
 
-  const bannerSection = (bannerHeight: string) => (
-    <div className="w-full shrink-0 relative" style={{ height: bannerHeight }}>
+  const bannerSide = (
+    <div className="h-full shrink-0 relative" style={{ width: "28vw" }}>
       <img
         src="/images/ramadan-banner.jpeg"
         alt="Ramadan Competition Banner"
-        className="w-full h-full object-contain"
-        style={{ objectPosition: "center" }}
+        className="w-full h-full object-cover object-center"
       />
     </div>
   );
 
   if (!session || session.status === "waiting" || !session.status) {
     return (
-      <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: "linear-gradient(180deg, #0a1628 0%, #122a4f 40%, #1a3a6e 70%, #c8873a 100%)" }}>
+      <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
         {connectionBadge}
-        {bannerSection("55vh")}
 
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -115,33 +113,34 @@ export default function Display() {
               animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 3, repeat: Infinity }}
             >
-              <p className="text-2xl md:text-3xl text-amber-200/80 font-arabic" data-testid="display-waiting-text">
+              <p className="text-3xl md:text-4xl text-amber-200/80 font-arabic" data-testid="display-waiting-text">
                 {t("waiting")}
               </p>
             </motion.div>
           </motion.div>
         </div>
+
+        {bannerSide}
       </div>
     );
   }
 
   if (session.status === "finished") {
     return (
-      <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: "linear-gradient(180deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+      <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
         {connectionBadge}
-        {bannerSection("28vh")}
 
-        <div className="flex-1 flex flex-col relative z-10 overflow-hidden px-6 py-4">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2 shrink-0 mb-4">
+        <div className="flex-1 flex flex-col relative z-10 overflow-hidden px-6 py-5">
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2 shrink-0 mb-5">
             <div className="flex items-center justify-center gap-4">
-              <Trophy className="h-12 w-12 text-amber-400 drop-shadow-lg" />
-              <h1 className={`text-4xl md:text-5xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}>
+              <Trophy className="h-14 w-14 text-amber-400 drop-shadow-lg" />
+              <h1 className={`text-5xl md:text-6xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}>
                 {t("gameOver")}
               </h1>
             </div>
           </motion.div>
 
-          <div className="flex-1 overflow-auto space-y-3 max-w-5xl mx-auto w-full">
+          <div className="flex-1 overflow-auto space-y-3 max-w-4xl mx-auto w-full">
             {sortedTeams.map((team, index) => {
               const teamScore = scores.find((s) => s.teamId === team.id);
               const score = teamScore?.score || 0;
@@ -151,7 +150,7 @@ export default function Display() {
                   initial={{ opacity: 0, x: -50 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.15 }}
-                  className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl backdrop-blur-sm ${
+                  className={`flex items-center gap-5 p-5 rounded-2xl backdrop-blur-sm ${
                     index === 0 ? "bg-amber-500/20 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/10" : "bg-white/8 border border-white/10"
                   }`}
                 >
@@ -161,23 +160,25 @@ export default function Display() {
                     )}
                   </div>
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg"
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg"
                     style={{ backgroundColor: team.color }}
                   >
                     <Users className="h-5 w-5" />
                   </div>
-                  <span className={`text-xl md:text-2xl font-bold text-white flex-1 ${isRTL ? "font-arabic" : ""}`}>
+                  <span className={`text-2xl md:text-3xl font-bold text-white flex-1 ${isRTL ? "font-arabic" : ""}`}>
                     {language === "ar" ? team.nameAr : team.nameEn}
                   </span>
                   <div className="text-right">
-                    <span className="text-3xl md:text-4xl font-bold text-amber-400">{score}</span>
-                    <p className="text-xs text-white/40">{t("points")}</p>
+                    <span className="text-4xl md:text-5xl font-bold text-amber-400">{score}</span>
+                    <p className="text-sm text-white/40">{t("points")}</p>
                   </div>
                 </motion.div>
               );
             })}
           </div>
         </div>
+
+        {bannerSide}
       </div>
     );
   }
@@ -211,20 +212,10 @@ export default function Display() {
   };
 
   return (
-    <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: "linear-gradient(180deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+    <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
       {connectionBadge}
 
-      <div className="w-full shrink-0 relative" style={{ height: "18vh" }}>
-        <img
-          src="/images/ramadan-banner.jpeg"
-          alt="Ramadan Competition Banner"
-          className="w-full h-full object-contain"
-          style={{ objectPosition: "center" }}
-        />
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-[#122a4f]" />
-      </div>
-
-      <div className="flex-1 flex flex-col px-4 md:px-5 pb-3 overflow-hidden relative z-10">
+      <div className="flex-1 flex flex-col px-5 py-3 overflow-hidden relative z-10">
         {currentTeam && (
           <div className="flex items-center justify-between gap-4 py-2 shrink-0">
             <div className="flex items-center gap-3">
@@ -305,7 +296,7 @@ export default function Display() {
                     </div>
                   </div>
 
-                  <div className="p-5 md:p-6 rounded-2xl bg-white/8 backdrop-blur-sm border border-white/10 shadow-xl shrink-0">
+                  <div className="p-5 rounded-2xl bg-white/8 backdrop-blur-sm border border-white/10 shadow-xl shrink-0">
                     <div className="flex items-start gap-4">
                       <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/20 shrink-0 mt-0.5">
                         <HelpCircle className="h-5 w-5 text-amber-400" />
@@ -323,7 +314,7 @@ export default function Display() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.1 }}
-                        className={`flex items-center gap-3 p-3.5 md:p-4 rounded-xl border-2 transition-all duration-300 ${getOptionDisplayStyle(option.key)}`}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-300 ${getOptionDisplayStyle(option.key)}`}
                         data-testid={`display-option-${option.key}`}
                       >
                         <span className={`flex items-center justify-center w-10 h-10 rounded-full text-base font-bold shrink-0 ${
@@ -339,20 +330,12 @@ export default function Display() {
                           {option.text}
                         </span>
                         {answerResult && option.key === answerResult.correctAnswer && (
-                          <motion.div
-                            initial={{ scale: 0, rotate: -180 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                          >
+                          <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}>
                             <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
                           </motion.div>
                         )}
                         {answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 300 }}
-                          >
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
                             <XCircle className="h-8 w-8 text-red-400 shrink-0" />
                           </motion.div>
                         )}
@@ -376,28 +359,15 @@ export default function Display() {
                       >
                         {answerResult.isCorrect ? (
                           <>
-                            <motion.div
-                              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.3, 1] }}
-                              transition={{ duration: 0.6, repeat: 2 }}
-                            >
+                            <motion.div animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.3, 1] }} transition={{ duration: 0.6, repeat: 2 }}>
                               <CheckCircle2 className="h-12 w-12" />
                             </motion.div>
                             <span className={`text-4xl ${isRTL ? "font-arabic" : ""}`}>{t("correct")}</span>
-                            <motion.span
-                              initial={{ scale: 0 }}
-                              animate={{ scale: [0, 1.5, 1] }}
-                              transition={{ delay: 0.3, duration: 0.5 }}
-                              className="text-5xl"
-                            >
-                              +1
-                            </motion.span>
+                            <motion.span initial={{ scale: 0 }} animate={{ scale: [0, 1.5, 1] }} transition={{ delay: 0.3, duration: 0.5 }} className="text-5xl">+1</motion.span>
                           </>
                         ) : (
                           <>
-                            <motion.div
-                              animate={{ x: [-5, 5, -5, 5, 0] }}
-                              transition={{ duration: 0.5, repeat: 1 }}
-                            >
+                            <motion.div animate={{ x: [-5, 5, -5, 5, 0] }} transition={{ duration: 0.5, repeat: 1 }}>
                               <XCircle className="h-12 w-12" />
                             </motion.div>
                             <span className={`text-4xl ${isRTL ? "font-arabic" : ""}`}>{t("incorrect")}</span>
@@ -422,10 +392,7 @@ export default function Display() {
                       className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-blue-500/15 border-2 border-blue-400/25 backdrop-blur-sm"
                       data-testid="display-team-completed"
                     >
-                      <motion.div
-                        animate={{ rotate: [0, 10, -10, 0] }}
-                        transition={{ duration: 0.5, repeat: 3 }}
-                      >
+                      <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 0.5, repeat: 3 }}>
                         <CheckCircle2 className="h-16 w-16 text-blue-400" />
                       </motion.div>
                       <p className={`text-2xl md:text-3xl text-white font-bold text-center ${isRTL ? "font-arabic" : ""}`}>
@@ -437,9 +404,7 @@ export default function Display() {
                         {t("teamCompletedMoving")}
                       </p>
                       <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10">
-                        <div className="w-5 h-5 rounded-full" style={{
-                          backgroundColor: teams.find(t => t.id === teamCompleted.nextTeamId)?.color
-                        }} />
+                        <div className="w-5 h-5 rounded-full" style={{ backgroundColor: teams.find(t => t.id === teamCompleted.nextTeamId)?.color }} />
                         <span className={`text-xl md:text-2xl text-white font-bold ${isRTL ? "font-arabic" : ""}`}>
                           {teams.find(t => t.id === teamCompleted.nextTeamId)
                             ? language === "ar"
@@ -451,10 +416,7 @@ export default function Display() {
                     </motion.div>
                   ) : (
                     <>
-                      <motion.div
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      >
+                      <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
                         <Sparkles className="h-16 w-16 text-amber-400/40" />
                       </motion.div>
                       <p className={`text-2xl text-white/50 font-medium ${isRTL ? "font-arabic" : ""}`} data-testid="display-waiting-selection">
@@ -475,7 +437,7 @@ export default function Display() {
             </AnimatePresence>
           </div>
 
-          <div className="w-64 lg:w-72 shrink-0 flex flex-col min-h-0 overflow-hidden">
+          <div className="w-56 lg:w-64 shrink-0 flex flex-col min-h-0 overflow-hidden">
             <div className="flex items-center gap-2 mb-3 shrink-0">
               <Trophy className="h-5 w-5 text-amber-400" />
               <h3 className={`text-xs font-semibold text-amber-200/60 uppercase tracking-widest ${isRTL ? "font-arabic" : ""}`}>
@@ -499,7 +461,7 @@ export default function Display() {
                     }`}
                     data-testid={`display-team-score-${team.id}`}
                   >
-                    <div className="flex items-center gap-2.5 mb-1.5">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <div className="w-6 shrink-0 flex justify-center">
                         {getRankIcon(index) || (
                           <span className="text-sm font-bold text-white/40">{index + 1}</span>
@@ -534,6 +496,8 @@ export default function Display() {
           </div>
         </div>
       </div>
+
+      {bannerSide}
     </div>
   );
 }
