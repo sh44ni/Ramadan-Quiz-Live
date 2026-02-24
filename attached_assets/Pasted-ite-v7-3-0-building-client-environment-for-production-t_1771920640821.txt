@@ -1,0 +1,42 @@
+ite v7.3.0 building client environment for production...
+
+transforming...
+
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+✓ 2094 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                                 1.12 kB │ gzip:   0.60 kB
+
+building server...
+
+
+  dist/index.cjs  1.1mb ⚠️
+
+⚡ Done in 255ms
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.10.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.1
+npm notice To update run: npm install -g npm@11.10.1
+npm notice
+
+2026-02-24T08:06:11Z info: Pushing pid1 binary layer...
+2026-02-24T08:06:12Z info: Pushing Repl layer...
+2026-02-24T08:06:12Z info: Pushing hosting layer...
+2026-02-24T08:06:12Z info: Created hosting layer
+2026-02-24T08:06:14Z info: Created pid1 binary layer
+2026-02-24T08:06:31Z info: Created Repl layer
+2026-02-24T08:06:31Z info: Pushing Repl (cache) layer...
+2026-02-24T08:06:31Z info: Created Repl (cache) layer
+2026-02-24T08:06:35Z info: Pushed image manifest
+2026-02-24T08:06:36Z info: Pushed soci index manifest
+2026-02-24T08:06:39Z info: Creating Autoscale service
+8:06:59 AM [ws] WebSocket server initialized on /ws
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-24T08:09:31Z error: The deployment is failing health checks. This can happen if the application isn't responding, responds with an error, or doesn't respond in time. Health checks are sent to the / endpoint by default and must respond as soon as possible. Make sure that the / endpoint is implemented and returns a 200 status code in a timely manner. Avoid doing expensive or long running operations on the / endpoint, prefer deferring them to a different route. Check the logs for more information.
