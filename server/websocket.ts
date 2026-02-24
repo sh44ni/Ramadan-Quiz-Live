@@ -197,7 +197,7 @@ async function startEntryPhase() {
   gameState.phase = "entry";
   gameState.entryTeams = [];
 
-  startTimer(300, async () => {
+  startTimer(60, async () => {
     await endEntryPhase();
   });
 
