@@ -197,7 +197,7 @@ async function startEntryPhase() {
   gameState.phase = "entry";
   gameState.entryTeams = [];
 
-  startTimer(60, async () => {
+  startTimer(300, async () => {
     await endEntryPhase();
   });
 
@@ -601,6 +601,12 @@ async function handleMessage(ws: WebSocket, raw: string) {
             gameState.entryTeams.push(msg.teamId);
             broadcast({ type: "team-joined", teamId: msg.teamId });
             await broadcastFullState();
+
+            const allTeams = await storage.getTeams();
+            if (gameState.entryTeams.length >= allTeams.length) {
+              stopTimer();
+              await endEntryPhase();
+            }
           }
         }
         break;
