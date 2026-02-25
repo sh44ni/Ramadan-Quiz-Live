@@ -61,6 +61,7 @@ import {
   Monitor as MonitorIcon,
   Languages,
   BarChart3,
+  User,
 } from "lucide-react";
 import type { Team, GameSession, TeamScore, AuthorizedEmail, Category, Question } from "@shared/schema";
 
@@ -592,9 +593,13 @@ export default function Admin() {
                   <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
                     {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
                   </span>
-                  {currentPlayerName && (
-                    <Badge variant="outline" className="text-xs font-arabic">{currentPlayerName}</Badge>
-                  )}
+                </div>
+              )}
+              {currentPlayerName && (
+                <div className="flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-xs text-muted-foreground">{t("currentPlayerLabel")}:</span>
+                  <Badge variant="outline" className="text-xs font-arabic">{currentPlayerName}</Badge>
                 </div>
               )}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -703,7 +708,10 @@ export default function Admin() {
                   {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
                 </span>
                 {currentPlayerName && (
-                  <Badge variant="outline" className="text-xs ms-auto font-arabic">{currentPlayerName}</Badge>
+                  <div className="flex items-center gap-1.5 ms-auto">
+                    <User className="h-3 w-3 text-amber-500" />
+                    <Badge variant="outline" className="text-xs font-arabic">{currentPlayerName}</Badge>
+                  </div>
                 )}
               </div>
             )}

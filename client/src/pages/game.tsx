@@ -124,6 +124,7 @@ export default function Game() {
 
   const isMyTurn = playerTeamId === currentTeamId && playerName === currentPlayerName;
   const isMyTeamTurn = playerTeamId === currentTeamId;
+  const playerTeam = teams.find((t) => t.id === playerTeamId);
 
   if (!authChecked) {
     return (
@@ -192,6 +193,19 @@ export default function Game() {
           >
             <Moon className="h-20 w-20 text-amber-400 fill-amber-400 mx-auto drop-shadow-lg" />
           </motion.div>
+          {playerName && (
+            <h2 className={`text-2xl font-bold text-amber-300 ${isRTL ? "font-arabic" : ""}`} data-testid="text-welcome-player">
+              {t("welcomePlayer", { name: playerName })}
+            </h2>
+          )}
+          {playerTeam && (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: playerTeam.color }} />
+              <span className={`text-lg text-white/80 ${isRTL ? "font-arabic" : ""}`} data-testid="text-player-team">
+                {language === "ar" ? playerTeam.nameAr : playerTeam.nameEn}
+              </span>
+            </div>
+          )}
           <h2 className={`text-3xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-waiting">
             {t("waiting")}
           </h2>
@@ -254,6 +268,19 @@ export default function Game() {
             </div>
           </div>
 
+          {playerName && (
+            <h2 className={`text-xl font-bold text-amber-300 ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-welcome">
+              {t("welcomePlayer", { name: playerName })}
+            </h2>
+          )}
+          {playerTeam && (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: playerTeam.color }} />
+              <span className={`text-base text-white/80 ${isRTL ? "font-arabic" : ""}`}>
+                {language === "ar" ? playerTeam.nameAr : playerTeam.nameEn}
+              </span>
+            </div>
+          )}
           <h2 className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-phase">
             {t("entryPhase")}
           </h2>
