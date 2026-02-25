@@ -1374,8 +1374,55 @@ export default function Admin() {
             </motion.div>
           )}
 
+          <p className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+            One captain email per team — the captain logs in and plays on behalf of their team
+          </p>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col sm:flex-row gap-2">
+              <Select
+                value={newTeamId}
+                onValueChange={(val) => {
+                  if (val) {
+                    const team = teams.find((t: Team) => String(t.id) === val);
+                    if (team) {
+                      setNewTeamId(val);
+                      setNewName(team.captain);
+                      setNewPlayerName(team.captain);
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger data-testid="select-team-captain" className="sm:w-56">
+                  <SelectValue placeholder="Select team">
+                    {newTeamId && (() => {
+                      const team = teams.find((t: Team) => String(t.id) === newTeamId);
+                      return team ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                          <span className="font-arabic truncate">{language === "ar" ? team.nameAr : team.nameEn}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((team: Team) => {
+                    const alreadyRegistered = authorizedEmails.some((e: AuthorizedEmail) => e.teamId === team.id);
+                    return (
+                      <SelectItem key={team.id} value={String(team.id)} disabled={alreadyRegistered}>
+                        <div className="flex items-center gap-2 w-full">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-arabic text-sm">{language === "ar" ? team.nameAr : team.nameEn}</span>
+                            <span className="text-xs text-muted-foreground font-arabic">{team.captain}</span>
+                          </div>
+                          {alreadyRegistered && <Badge variant="secondary" className="text-[9px] ml-auto">✓</Badge>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
               <Input
                 type="email"
                 placeholder={t("emailAddress")}
@@ -1383,46 +1430,8 @@ export default function Admin() {
                 onChange={(e) => setNewEmail(e.target.value)}
                 dir="ltr"
                 data-testid="input-new-email"
+                className="flex-1"
               />
-              <Select
-                value={newName ? `${newTeamId}::${newName}::${newPlayerName}` : ""}
-                onValueChange={(val) => {
-                  if (val) {
-                    const [teamId, name, playerName] = val.split("::");
-                    setNewTeamId(teamId);
-                    setNewName(name);
-                    setNewPlayerName(playerName || "");
-                  }
-                }}
-              >
-                <SelectTrigger data-testid="select-player-name">
-                  <SelectValue placeholder={t("selectPlayer")}>
-                    {newName && (
-                      <span className="font-arabic">{newPlayerName || newName}</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {teams.map((team: Team) => {
-                    const allPlayers = [team.captain, ...team.members.filter((m: string) => m !== team.captain)];
-                    return (
-                      <div key={team.id}>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground font-arabic">
-                          {language === "ar" ? team.nameAr : team.nameEn}
-                        </div>
-                        {allPlayers.map((player: string) => (
-                          <SelectItem
-                            key={`${team.id}-${player}`}
-                            value={`${team.id}::${player}::${player}`}
-                          >
-                            <span className="font-arabic">{player}</span>
-                          </SelectItem>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
               <Button
                 onClick={() => addEmailMutation.mutate()}
                 disabled={addEmailMutation.isPending || !newEmail.trim() || !newName.trim()}
@@ -1449,20 +1458,30 @@ export default function Admin() {
                   className="flex items-center gap-2 p-2.5 rounded-md bg-muted/30"
                   data-testid={`row-email-${entry.id}`}
                 >
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Mail className="h-3.5 w-3.5 text-primary" />
-                  </div>
+                  {(() => {
+                    const team = entry.teamId ? teams.find((t: Team) => t.id === entry.teamId) : null;
+                    return (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-2 ring-white/10"
+                        style={{ backgroundColor: team ? team.color + "33" : undefined }}
+                      >
+                        {team
+                          ? <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: team.color }} />
+                          : <Mail className="h-3.5 w-3.5 text-primary" />
+                        }
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium truncate" dir="ltr">{entry.email}</span>
                       {entry.playerName && (
-                        <span className="text-xs text-muted-foreground font-arabic">({entry.playerName})</span>
+                        <span className="text-xs text-amber-600 font-arabic font-semibold">({entry.playerName})</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground">{entry.name}</span>
                       {entry.teamId && (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[10px] font-arabic">
                           {getTeamName(entry.teamId)}
                         </Badge>
                       )}
