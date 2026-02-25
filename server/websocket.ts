@@ -22,13 +22,14 @@ interface InMemoryGameState {
   entryTeams: number[];
   pausedPhase: GamePhase | null;
   pausedTimerSeconds: number;
+  gameError: string | null;
 }
 
 const defaultGameState: InMemoryGameState = {
   phase: "idle",
   sessionId: null,
   totalQuestions: 31,
-  questionsPerTeam: 6,
+  questionsPerTeam: 5,
   teamOrder: [],
   teamPlayers: {},
   currentTeamIndex: 0,
@@ -41,6 +42,7 @@ const defaultGameState: InMemoryGameState = {
   entryTeams: [],
   pausedPhase: null,
   pausedTimerSeconds: 0,
+  gameError: null,
 };
 
 let gameState: InMemoryGameState = { ...defaultGameState };
@@ -158,6 +160,7 @@ async function broadcastFullState() {
         teamQuestionsAnswered: gameState.teamQuestionsAnswered,
         currentTeamIndex: gameState.currentTeamIndex,
         teamOrder: gameState.teamOrder,
+        gameError: gameState.gameError,
       },
     });
   } catch (error) {
@@ -168,6 +171,7 @@ async function broadcastFullState() {
 async function startEntryPhase() {
   gameState.phase = "entry";
   gameState.entryTeams = [];
+  gameState.gameError = null;
 
   startTimer(60, async () => {
     await endEntryPhase();
@@ -180,11 +184,11 @@ async function startEntryPhase() {
 async function endEntryPhase() {
   if (gameState.entryTeams.length < 2) {
     stopTimer();
-    broadcast({ type: "game-error", reason: "not-enough-teams", count: gameState.entryTeams.length });
+    gameState.gameError = "not-enough-teams";
+    gameState.phase = "finished";
     if (gameState.sessionId) {
       await storage.updateSession(gameState.sessionId, { status: "finished" });
     }
-    gameState.phase = "finished";
     await broadcastFullState();
     return;
   }
@@ -524,6 +528,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
             teamQuestionsAnswered: gameState.teamQuestionsAnswered,
             currentTeamIndex: gameState.currentTeamIndex,
             teamOrder: gameState.teamOrder,
+            gameError: gameState.gameError,
           },
         }));
         ws.send(JSON.stringify({ type: "timer-update", seconds: gameState.timerSeconds, running: gameState.timerRunning, phase: gameState.phase }));

@@ -133,9 +133,6 @@ export function useGameSocket() {
           case "entry-closed":
             break;
           case "game-error":
-            if (msg.reason === "not-enough-teams") {
-              setGameState((prev) => ({ ...prev, phase: "finished", gameError: "not-enough-teams" }));
-            }
             break;
           case "game-started":
             break;

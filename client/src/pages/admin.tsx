@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Scoreboard } from "@/components/scoreboard";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -500,6 +508,35 @@ export default function Admin() {
 
   return (
     <div className="p-3 md:p-5 space-y-4 islamic-pattern min-h-[calc(100vh-52px)]">
+
+      <Dialog open={wsGameState.gameError === "not-enough-teams"}>
+        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <div className="flex justify-center mb-3">
+              <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center ring-4 ring-red-400/20">
+                <Users className="h-8 w-8 text-red-500" />
+              </div>
+            </div>
+            <DialogTitle className={`text-center text-red-600 ${isRTL ? "font-arabic" : ""}`}>
+              {t("notEnoughTeams")}
+            </DialogTitle>
+            <DialogDescription className={`text-center ${isRTL ? "font-arabic" : ""}`}>
+              {t("notEnoughTeamsDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="justify-center">
+            <Button
+              variant="destructive"
+              onClick={() => { adminReset(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+              data-testid="button-error-reset"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => setLocation("/")} data-testid="button-back-admin">
@@ -610,16 +647,6 @@ export default function Admin() {
                 <span>|</span>
                 <span>{answeredCount}/{totalQuestions} {t("questions")}</span>
               </div>
-            </div>
-          )}
-
-          {gamePhase === "finished" && wsGameState.gameError === "not-enough-teams" && (
-            <div className="p-3 rounded-md bg-red-500/10 border border-red-400/30 space-y-1 mb-2">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-red-400" />
-                <span className={`text-sm font-semibold text-red-400 ${isRTL ? "font-arabic" : ""}`}>{t("notEnoughTeams")}</span>
-              </div>
-              <p className={`text-xs text-red-300/80 ${isRTL ? "font-arabic" : ""}`}>{t("notEnoughTeamsDesc")}</p>
             </div>
           )}
 
