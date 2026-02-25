@@ -17,11 +17,11 @@ export interface GameState {
   currentPlayerAvailableNumbers: number[];
   usedQuestionNumbers: number[];
   teamPlayers: Record<number, string[]>;
-  playerAssignments: Record<string, number[]>;
   entryTeams: number[];
   totalQuestions: number;
+  questionsPerTeam: number;
+  teamQuestionsAnswered: Record<number, number>;
   currentTeamIndex: number;
-  currentPlayerIndex: number;
   teamOrder: number[];
 }
 
@@ -58,11 +58,11 @@ const defaultState: GameState = {
   currentPlayerAvailableNumbers: [],
   usedQuestionNumbers: [],
   teamPlayers: {},
-  playerAssignments: {},
   entryTeams: [],
   totalQuestions: 31,
+  questionsPerTeam: 6,
+  teamQuestionsAnswered: {},
   currentTeamIndex: 0,
-  currentPlayerIndex: 0,
   teamOrder: [],
 };
 
@@ -215,6 +215,7 @@ export function useGameSocket() {
   const adminSetTeam = useCallback((teamId: number) => send({ type: "admin-set-team", teamId }), [send]);
   const adminAdjustScore = useCallback((teamId: number, points: number) => send({ type: "admin-adjust-score", teamId, points }), [send]);
   const adminForceAdvance = useCallback(() => send({ type: "admin-force-advance" }), [send]);
+  const adminTiebreaker = useCallback((teamIds: number[]) => send({ type: "admin-tiebreaker", teamIds }), [send]);
 
   return {
     gameState,
@@ -235,5 +236,6 @@ export function useGameSocket() {
     adminSetTeam,
     adminAdjustScore,
     adminForceAdvance,
+    adminTiebreaker,
   };
 }

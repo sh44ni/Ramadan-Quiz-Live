@@ -26,7 +26,7 @@ export default function Display() {
   const { isRTL, language } = useLanguage();
   const { gameState, timer, answerResult, teamCompleted, connected } = useGameSocket();
 
-  const { session, scores, teams, questions, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, entryTeams } = gameState;
+  const { session, scores, teams, questions, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered } = gameState;
   const currentTeam = teams.find((t) => t.id === currentTeamId);
 
   useEffect(() => {
@@ -356,9 +356,15 @@ export default function Display() {
               <Badge className={`text-sm px-3 py-1 ${getPhaseColor()}`}>
                 {getPhaseLabel()}
               </Badge>
+              {currentTeamId && (
+                <div className="text-right">
+                  <span className="text-xs text-white/40">Team Q</span>
+                  <p className="text-base font-bold text-amber-300">{teamQuestionsAnswered[currentTeamId] || 0}/{questionsPerTeam}</p>
+                </div>
+              )}
               <div className="text-right">
                 <span className="text-xs text-white/40">{t("questions")}</span>
-                <p className="text-base font-bold text-amber-300">{usedQuestionNumbers.length}/{gameState.totalQuestions}</p>
+                <p className="text-base font-bold text-amber-300">{usedQuestionNumbers.length}/{totalQuestions}</p>
               </div>
             </div>
           </div>

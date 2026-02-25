@@ -97,6 +97,7 @@ export default function Admin() {
     adminSetTeam,
     adminAdjustScore,
     adminForceAdvance,
+    adminTiebreaker,
   } = useGameSocket();
 
   const [qbSearch, setQbSearch] = useState("");
@@ -119,6 +120,7 @@ export default function Admin() {
   const [catFormNameAr, setCatFormNameAr] = useState("");
   const [catFormColor, setCatFormColor] = useState("#6B7280");
   const [showCatManager, setShowCatManager] = useState(false);
+  const [tiebreakerTeams, setTiebreakerTeams] = useState<number[]>([]);
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -608,6 +610,50 @@ export default function Admin() {
                 <span>|</span>
                 <span>{answeredCount}/{totalQuestions} {t("questions")}</span>
               </div>
+            </div>
+          )}
+
+          {gamePhase === "finished" && scores.length > 0 && (
+            <div className="p-3 rounded-md bg-muted/30 space-y-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <span className={`text-sm font-semibold ${isRTL ? "font-arabic" : ""}`}>Tiebreaker</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Select tied teams to restart with remaining questions</p>
+              <div className="space-y-1">
+                {teams.map((team: Team) => {
+                  const checked = tiebreakerTeams.includes(team.id);
+                  return (
+                    <label key={team.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => setTiebreakerTeams(prev =>
+                          prev.includes(team.id) ? prev.filter(id => id !== team.id) : [...prev, team.id]
+                        )}
+                        className="accent-amber-500"
+                      />
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                      <span className={`text-sm font-arabic ${isRTL ? "" : ""}`}>
+                        {language === "ar" ? team.nameAr : team.nameEn}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {scores.find((s: any) => s.teamId === team.id)?.score ?? 0} pts
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <Button
+                onClick={() => { if (tiebreakerTeams.length >= 2) { adminTiebreaker(tiebreakerTeams); setTiebreakerTeams([]); } }}
+                disabled={tiebreakerTeams.length < 2}
+                size="sm"
+                className="w-full bg-amber-500/20 text-amber-700 border-amber-400/30"
+                data-testid="button-tiebreaker"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Start Tiebreaker ({tiebreakerTeams.length} teams)
+              </Button>
             </div>
           )}
 

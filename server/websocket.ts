@@ -5,21 +5,15 @@ import { log } from "./index";
 
 type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "finished";
 
-interface PlayerInfo {
-  name: string;
-  teamId: number;
-  assignedNumbers: number[];
-}
-
 interface InMemoryGameState {
   phase: GamePhase;
   sessionId: number | null;
   totalQuestions: number;
+  questionsPerTeam: number;
   teamOrder: number[];
   teamPlayers: Record<number, string[]>;
   currentTeamIndex: number;
-  currentPlayerIndex: number;
-  playerAssignments: Record<string, number[]>;
+  teamQuestionsAnswered: Record<number, number>;
   usedQuestionNumbers: number[];
   selectedQuestionId: number | null;
   questionNumberMap: Record<number, number>;
@@ -34,11 +28,11 @@ const defaultGameState: InMemoryGameState = {
   phase: "idle",
   sessionId: null,
   totalQuestions: 31,
+  questionsPerTeam: 6,
   teamOrder: [],
   teamPlayers: {},
   currentTeamIndex: 0,
-  currentPlayerIndex: 0,
-  playerAssignments: {},
+  teamQuestionsAnswered: {},
   usedQuestionNumbers: [],
   selectedQuestionId: null,
   questionNumberMap: {},
@@ -98,25 +92,6 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function assignQuestionsToPlayers(teamPlayers: Record<number, string[]>, totalQuestions: number): Record<string, number[]> {
-  const assignments: Record<string, number[]> = {};
-  const allNumbers = Array.from({ length: totalQuestions }, (_, i) => i + 1);
-
-  const allPlayerKeys: string[] = [];
-  for (const teamId of Object.keys(teamPlayers)) {
-    for (const player of teamPlayers[Number(teamId)]) {
-      allPlayerKeys.push(`${teamId}:${player}`);
-    }
-  }
-
-  for (const key of allPlayerKeys) {
-    const shuffled = shuffleArray(allNumbers);
-    assignments[key] = shuffled.slice(0, 6);
-  }
-
-  return assignments;
-}
-
 function getCurrentTeamId(): number | null {
   if (gameState.teamOrder.length === 0) return null;
   return gameState.teamOrder[gameState.currentTeamIndex % gameState.teamOrder.length];
@@ -127,13 +102,12 @@ function getCurrentPlayerName(): string | null {
   if (!teamId) return null;
   const players = gameState.teamPlayers[teamId];
   if (!players || players.length === 0) return null;
-  return players[gameState.currentPlayerIndex % players.length];
+  return players[0];
 }
 
-function getPlayerAssignedNumbers(teamId: number, playerName: string): number[] {
-  const key = `${teamId}:${playerName}`;
-  const assigned = gameState.playerAssignments[key] || [];
-  return assigned.filter((n) => !gameState.usedQuestionNumbers.includes(n));
+function getAvailableNumbers(): number[] {
+  return Array.from({ length: gameState.totalQuestions }, (_, i) => i + 1)
+    .filter((n) => !gameState.usedQuestionNumbers.includes(n));
 }
 
 async function buildQuestionNumberMap() {
@@ -160,9 +134,7 @@ async function broadcastFullState() {
       ? await storage.getQuestion(gameState.selectedQuestionId)
       : null;
 
-    const currentPlayerAvailableNumbers = currentTeamId && currentPlayerName
-      ? getPlayerAssignedNumbers(currentTeamId, currentPlayerName)
-      : [];
+    const currentPlayerAvailableNumbers = getAvailableNumbers();
 
     broadcast({
       type: "game-state",
@@ -180,11 +152,11 @@ async function broadcastFullState() {
         currentPlayerAvailableNumbers,
         usedQuestionNumbers: gameState.usedQuestionNumbers,
         teamPlayers: gameState.teamPlayers,
-        playerAssignments: gameState.playerAssignments,
         entryTeams: gameState.entryTeams,
         totalQuestions: gameState.totalQuestions,
+        questionsPerTeam: gameState.questionsPerTeam,
+        teamQuestionsAnswered: gameState.teamQuestionsAnswered,
         currentTeamIndex: gameState.currentTeamIndex,
-        currentPlayerIndex: gameState.currentPlayerIndex,
         teamOrder: gameState.teamOrder,
       },
     });
@@ -215,19 +187,17 @@ async function endEntryPhase() {
 
   const teams = await storage.getTeams();
   gameState.teamPlayers = {};
+  gameState.teamQuestionsAnswered = {};
   for (const team of teams) {
     if (gameState.teamOrder.includes(team.id)) {
-      const players = [team.captain, ...team.members.filter((m) => m !== team.captain)];
-      gameState.teamPlayers[team.id] = players;
+      gameState.teamPlayers[team.id] = [team.captain, ...team.members.filter((m) => m !== team.captain)];
+      gameState.teamQuestionsAnswered[team.id] = 0;
     }
   }
 
   await buildQuestionNumberMap();
 
-  gameState.playerAssignments = assignQuestionsToPlayers(gameState.teamPlayers, gameState.totalQuestions);
-
   gameState.currentTeamIndex = 0;
-  gameState.currentPlayerIndex = 0;
 
   broadcast({ type: "entry-closed" });
   await startSelectionPhase();
@@ -237,15 +207,10 @@ async function startSelectionPhase() {
   gameState.phase = "selection";
   gameState.selectedQuestionId = null;
 
-  const teamId = getCurrentTeamId();
-  const playerName = getCurrentPlayerName();
-
-  if (teamId && playerName) {
-    const available = getPlayerAssignedNumbers(teamId, playerName);
-    if (available.length === 0) {
-      await advanceToNextPlayer();
-      return;
-    }
+  const available = getAvailableNumbers();
+  if (available.length === 0) {
+    await endGame();
+    return;
   }
 
   if (gameState.sessionId) {
@@ -265,19 +230,13 @@ async function startSelectionPhase() {
 }
 
 async function handleSelectionTimeout() {
-  const teamId = getCurrentTeamId();
-  const playerName = getCurrentPlayerName();
-
-  if (teamId && playerName) {
-    const available = getPlayerAssignedNumbers(teamId, playerName);
-    if (available.length > 0) {
-      const autoPickNumber = available[0];
-      await handleQuestionSelection(autoPickNumber);
-      return;
-    }
+  const available = getAvailableNumbers();
+  if (available.length > 0) {
+    const autoPickNumber = available[0];
+    await handleQuestionSelection(autoPickNumber);
+  } else {
+    await endGame();
   }
-
-  await advanceToNextPlayer();
 }
 
 async function handleQuestionSelection(questionNumber: number) {
@@ -361,6 +320,8 @@ async function handleAnswerTimeout() {
         questionsAnswered: teamScore.questionsAnswered + 1,
       });
     }
+
+    gameState.teamQuestionsAnswered[teamId] = (gameState.teamQuestionsAnswered[teamId] || 0) + 1;
   }
 
   broadcast({
@@ -380,7 +341,7 @@ async function handleAnswerTimeout() {
   await broadcastFullState();
 
   setTimeout(async () => {
-    await advanceToNextPlayer();
+    await advanceToNextTurn();
   }, 4000);
 }
 
@@ -423,6 +384,8 @@ async function handleAnswerSubmission(answer: string) {
     });
   }
 
+  gameState.teamQuestionsAnswered[teamId] = (gameState.teamQuestionsAnswered[teamId] || 0) + 1;
+
   broadcast({
     type: "answer-result",
     isCorrect,
@@ -437,25 +400,24 @@ async function handleAnswerSubmission(answer: string) {
   await broadcastFullState();
 
   setTimeout(async () => {
-    await advanceToNextPlayer();
+    await advanceToNextTurn();
   }, 4000);
 }
 
-async function advanceToNextPlayer() {
+async function advanceToNextTurn() {
   const teamId = getCurrentTeamId();
   if (!teamId) {
     await endGame();
     return;
   }
 
-  const players = gameState.teamPlayers[teamId] || [];
-  const nextPlayerIndex = gameState.currentPlayerIndex + 1;
+  const teamAnswered = (gameState.teamQuestionsAnswered[teamId] || 0);
+  const availableGlobal = getAvailableNumbers();
 
-  if (nextPlayerIndex < players.length) {
-    gameState.currentPlayerIndex = nextPlayerIndex;
-    await startSelectionPhase();
-  } else {
+  if (teamAnswered >= gameState.questionsPerTeam || availableGlobal.length === 0) {
     await advanceToNextTeam();
+  } else {
+    await startSelectionPhase();
   }
 }
 
@@ -463,9 +425,9 @@ async function advanceToNextTeam() {
   const nextTeamIndex = gameState.currentTeamIndex + 1;
 
   if (nextTeamIndex >= gameState.teamOrder.length) {
-    if (hasAnyPlayerWithAvailableQuestions()) {
+    const available = getAvailableNumbers();
+    if (available.length > 0 && hasAnyTeamWithRemainingQuestions()) {
       gameState.currentTeamIndex = 0;
-      gameState.currentPlayerIndex = 0;
       await startSelectionPhase();
     } else {
       await endGame();
@@ -473,16 +435,16 @@ async function advanceToNextTeam() {
     return;
   }
 
+  const completedTeamId = gameState.teamOrder[gameState.currentTeamIndex];
   gameState.currentTeamIndex = nextTeamIndex;
-  gameState.currentPlayerIndex = 0;
 
-  const teamId = getCurrentTeamId()!;
+  const nextTeamId = getCurrentTeamId()!;
   broadcast({
     type: "team-completed",
-    completedTeamId: gameState.teamOrder[nextTeamIndex - 1],
-    nextTeamId: teamId,
+    completedTeamId,
+    nextTeamId,
   });
-  broadcast({ type: "turn-changed", teamId });
+  broadcast({ type: "turn-changed", teamId: nextTeamId });
 
   await broadcastFullState();
 
@@ -491,15 +453,10 @@ async function advanceToNextTeam() {
   }, 3000);
 }
 
-function hasAnyPlayerWithAvailableQuestions(): boolean {
-  for (const teamId of gameState.teamOrder) {
-    const players = gameState.teamPlayers[teamId] || [];
-    for (const player of players) {
-      const available = getPlayerAssignedNumbers(teamId, player);
-      if (available.length > 0) return true;
-    }
-  }
-  return false;
+function hasAnyTeamWithRemainingQuestions(): boolean {
+  return gameState.teamOrder.some(
+    (teamId) => (gameState.teamQuestionsAnswered[teamId] || 0) < gameState.questionsPerTeam
+  );
 }
 
 async function endGame() {
@@ -532,9 +489,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
 
         const currentTeamId = getCurrentTeamId();
         const currentPlayerName = getCurrentPlayerName();
-        const currentPlayerAvailableNumbers = currentTeamId && currentPlayerName
-          ? getPlayerAssignedNumbers(currentTeamId, currentPlayerName)
-          : [];
+        const currentPlayerAvailableNumbers = getAvailableNumbers();
 
         ws.send(JSON.stringify({
           type: "game-state",
@@ -552,11 +507,11 @@ async function handleMessage(ws: WebSocket, raw: string) {
             currentPlayerAvailableNumbers,
             usedQuestionNumbers: gameState.usedQuestionNumbers,
             teamPlayers: gameState.teamPlayers,
-            playerAssignments: gameState.playerAssignments,
             entryTeams: gameState.entryTeams,
             totalQuestions: gameState.totalQuestions,
+            questionsPerTeam: gameState.questionsPerTeam,
+            teamQuestionsAnswered: gameState.teamQuestionsAnswered,
             currentTeamIndex: gameState.currentTeamIndex,
-            currentPlayerIndex: gameState.currentPlayerIndex,
             teamOrder: gameState.teamOrder,
           },
         }));
@@ -624,16 +579,15 @@ async function handleMessage(ws: WebSocket, raw: string) {
       case "player-select-question": {
         if (gameState.phase !== "selection") return;
 
-        const { questionNumber, teamId, playerName } = msg;
+        const { questionNumber, teamId } = msg;
         const currentTeamId = getCurrentTeamId();
-        const currentPlayer = getCurrentPlayerName();
 
-        if (teamId !== currentTeamId || playerName !== currentPlayer) {
+        if (teamId !== currentTeamId) {
           ws.send(JSON.stringify({ type: "error", message: "Not your turn" }));
           return;
         }
 
-        const available = getPlayerAssignedNumbers(teamId, playerName);
+        const available = getAvailableNumbers();
         if (!available.includes(questionNumber)) {
           ws.send(JSON.stringify({ type: "error", message: "Question not available" }));
           return;
@@ -736,7 +690,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
           if (gameState.sessionId) {
             await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
           }
-          await advanceToNextPlayer();
+          await advanceToNextTurn();
         }
         break;
       }
@@ -747,11 +701,28 @@ async function handleMessage(ws: WebSocket, raw: string) {
           if (teamIdx >= 0) {
             stopTimer();
             gameState.currentTeamIndex = teamIdx;
-            gameState.currentPlayerIndex = 0;
             broadcast({ type: "turn-changed", teamId: msg.teamId });
             await startSelectionPhase();
           }
         }
+        break;
+      }
+
+      case "admin-tiebreaker": {
+        if (gameState.phase !== "finished" || !gameState.sessionId) return;
+        const { teamIds } = msg as { teamIds: number[] };
+        if (!teamIds || teamIds.length < 2) return;
+
+        gameState.teamOrder = teamIds.filter((id) => gameState.teamPlayers[id]);
+        gameState.currentTeamIndex = 0;
+        for (const teamId of gameState.teamOrder) {
+          gameState.teamQuestionsAnswered[teamId] = 0;
+        }
+
+        await storage.updateSession(gameState.sessionId, { status: "active" });
+
+        broadcast({ type: "game-resumed" });
+        await startSelectionPhase();
         break;
       }
 
@@ -773,7 +744,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
           if (gameState.sessionId) {
             await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
           }
-          await advanceToNextPlayer();
+          await advanceToNextTurn();
         }
         break;
       }

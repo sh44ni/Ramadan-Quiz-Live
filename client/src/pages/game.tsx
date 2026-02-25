@@ -44,8 +44,9 @@ export default function Game() {
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
 
   const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion, joinTeam } = useGameSocket();
-  const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, currentPlayerAvailableNumbers, usedQuestionNumbers, teamPlayers, entryTeams } = gameState;
+  const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, teamPlayers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered } = gameState;
   const currentTeam = teams.find((t) => t.id === currentTeamId);
+  const allNumbers = Array.from({ length: totalQuestions }, (_, i) => i + 1);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -116,13 +117,13 @@ export default function Game() {
 
   const handleSelectQuestionNumber = useCallback(
     (questionNumber: number) => {
-      if (!playerTeamId || !playerName || phase !== "selection") return;
-      selectQuestion(questionNumber, playerTeamId, playerName);
+      if (!playerTeamId || phase !== "selection") return;
+      selectQuestion(questionNumber, playerTeamId, playerName || "");
     },
     [playerTeamId, playerName, phase, selectQuestion],
   );
 
-  const isMyTurn = playerTeamId === currentTeamId && playerName === currentPlayerName;
+  const isMyTurn = playerTeamId === currentTeamId;
   const isMyTeamTurn = playerTeamId === currentTeamId;
   const playerTeam = teams.find((t) => t.id === playerTeamId);
 
@@ -405,6 +406,12 @@ export default function Game() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
+                  {currentTeamId && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Hash className="h-3 w-3" />
+                      <span>{teamQuestionsAnswered[currentTeamId] || 0}/{questionsPerTeam}</span>
+                    </Badge>
+                  )}
                   {currentPlayerName && (
                     <Badge variant="outline" className="text-xs gap-1">
                       <User className="h-3 w-3" />
@@ -415,10 +422,6 @@ export default function Game() {
                     <Badge className="text-xs bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1">
                       <Zap className="h-3 w-3" />
                       {t("yourTurn")}
-                    </Badge>
-                  ) : isMyTeamTurn ? (
-                    <Badge variant="secondary" className="text-xs text-blue-600">
-                      {t("teammateTurn")}
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="text-xs text-amber-600">
@@ -511,17 +514,18 @@ export default function Game() {
                   </div>
 
                   {isMyTurn ? (
-                    <div className="grid grid-cols-3 gap-3" data-testid="question-number-grid">
-                      {currentPlayerAvailableNumbers.map((num) => {
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2" data-testid="question-number-grid">
+                      {allNumbers.map((num) => {
                         const isUsed = usedQuestionNumbers.includes(num);
                         return (
                           <motion.button
                             key={num}
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: num * 0.01 }}
                             onClick={() => !isUsed && handleSelectQuestionNumber(num)}
                             disabled={isUsed}
-                            className={`aspect-square rounded-xl border-2 text-2xl font-bold transition-all ${
+                            className={`aspect-square rounded-xl border-2 text-xl font-bold transition-all ${
                               isUsed
                                 ? "bg-muted/30 border-transparent opacity-40 cursor-not-allowed text-muted-foreground"
                                 : "bg-card border-amber-400/40 hover:border-amber-400 hover:bg-amber-500/10 hover:shadow-lg cursor-pointer active:scale-95 text-foreground"
@@ -529,7 +533,7 @@ export default function Game() {
                             data-testid={`button-question-number-${num}`}
                           >
                             {isUsed ? (
-                              <CheckCircle2 className="h-8 w-8 mx-auto text-muted-foreground" />
+                              <CheckCircle2 className="h-5 w-5 mx-auto text-muted-foreground" />
                             ) : (
                               num
                             )}
@@ -620,6 +624,34 @@ export default function Game() {
         </div>
 
         <div className="space-y-4">
+          {currentTeam && teamPlayers[currentTeam.id] && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-amber-500" />
+                <span className={`text-sm font-semibold ${isRTL ? "font-arabic" : ""}`}>
+                  {language === "ar" ? currentTeam.nameAr : currentTeam.nameEn}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {teamPlayers[currentTeam.id].map((member, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: currentTeam.color }}
+                    />
+                    <span className={`text-sm font-arabic ${idx === 0 ? "font-semibold text-amber-600" : "text-muted-foreground"}`}>
+                      {member}
+                    </span>
+                    {idx === 0 && (
+                      <Badge variant="outline" className="text-xs ml-auto py-0">
+                        <Crown className="h-3 w-3 text-amber-500" />
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card className="p-4">
             <Scoreboard
               teams={teams}
