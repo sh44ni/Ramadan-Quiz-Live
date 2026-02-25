@@ -20,7 +20,7 @@ const teamsData = [
   {
     nameEn: "Team 2: Al-Fallah (The Farmer)", nameAr: "الفريق (2): الفلاح", color: "#10B981",
     captain: "عمر سعيد",
-    members: ["غيث سعيد", "حاتم سعيد", "فلاح السعيدي"],
+    members: ["غيث سعيد", "فلاح السعيدي"],
   },
   {
     nameEn: "Team 3: Ahl Al-Raya (Flag People)", nameAr: "الفريق (3): أهل الراية", color: "#F59E0B",
@@ -40,7 +40,7 @@ const teamsData = [
   {
     nameEn: "Team 6: Marsa Al-Fikr (Harbor of Thought)", nameAr: "الفريق (6): مرسى الفكر", color: "#F97316",
     captain: "حميد خالد",
-    members: ["عمر ساعد", "إبراهيم المكتومي", "أبو مصعب"],
+    members: ["عمر ساعد", "إبراهيم المكتومي", "عبد الله الكيومي"],
   },
 ];
 
