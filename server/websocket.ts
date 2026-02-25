@@ -178,14 +178,25 @@ async function startEntryPhase() {
 }
 
 async function endEntryPhase() {
-  if (gameState.entryTeams.length === 0) {
-    const teams = await storage.getTeams();
-    gameState.entryTeams = teams.map((t) => t.id);
+  if (gameState.entryTeams.length < 2) {
+    stopTimer();
+    broadcast({ type: "game-error", reason: "not-enough-teams", count: gameState.entryTeams.length });
+    if (gameState.sessionId) {
+      await storage.updateSession(gameState.sessionId, { status: "finished" });
+    }
+    gameState.phase = "finished";
+    await broadcastFullState();
+    return;
   }
 
-  gameState.teamOrder = [...gameState.entryTeams];
+  const allTeams = await storage.getTeams();
+  gameState.teamOrder = [...gameState.entryTeams].sort((a, b) => {
+    const idxA = allTeams.findIndex((t) => t.id === a);
+    const idxB = allTeams.findIndex((t) => t.id === b);
+    return idxA - idxB;
+  });
 
-  const teams = await storage.getTeams();
+  const teams = allTeams;
   gameState.teamPlayers = {};
   gameState.teamQuestionsAnswered = {};
   for (const team of teams) {

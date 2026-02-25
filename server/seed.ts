@@ -24,7 +24,7 @@ const teamsData = [
   },
   {
     nameEn: "Team 3: Ahl Al-Raya (Flag People)", nameAr: "الفريق (3): أهل الراية", color: "#F59E0B",
-    captain: "حاتم سعيد",
+    captain: "حافظ سعيد",
     members: ["عصام سعيد", "محمود سعيد", "عبد الله سعيد"],
   },
   {

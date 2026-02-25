@@ -613,7 +613,17 @@ export default function Admin() {
             </div>
           )}
 
-          {gamePhase === "finished" && scores.length > 0 && (
+          {gamePhase === "finished" && wsGameState.gameError === "not-enough-teams" && (
+            <div className="p-3 rounded-md bg-red-500/10 border border-red-400/30 space-y-1 mb-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-red-400" />
+                <span className={`text-sm font-semibold text-red-400 ${isRTL ? "font-arabic" : ""}`}>{t("notEnoughTeams")}</span>
+              </div>
+              <p className={`text-xs text-red-300/80 ${isRTL ? "font-arabic" : ""}`}>{t("notEnoughTeamsDesc")}</p>
+            </div>
+          )}
+
+          {gamePhase === "finished" && !wsGameState.gameError && scores.length > 0 && (
             <div className="p-3 rounded-md bg-muted/30 space-y-2 mb-2">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />

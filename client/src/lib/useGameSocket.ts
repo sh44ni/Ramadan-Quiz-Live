@@ -23,6 +23,7 @@ export interface GameState {
   teamQuestionsAnswered: Record<number, number>;
   currentTeamIndex: number;
   teamOrder: number[];
+  gameError: string | null;
 }
 
 interface TimerState {
@@ -64,6 +65,7 @@ const defaultState: GameState = {
   teamQuestionsAnswered: {},
   currentTeamIndex: 0,
   teamOrder: [],
+  gameError: null,
 };
 
 export function useGameSocket() {
@@ -129,6 +131,11 @@ export function useGameSocket() {
             }));
             break;
           case "entry-closed":
+            break;
+          case "game-error":
+            if (msg.reason === "not-enough-teams") {
+              setGameState((prev) => ({ ...prev, phase: "finished", gameError: "not-enough-teams" }));
+            }
             break;
           case "game-started":
             break;

@@ -26,7 +26,7 @@ export default function Display() {
   const { isRTL, language } = useLanguage();
   const { gameState, timer, answerResult, teamCompleted, connected } = useGameSocket();
 
-  const { session, scores, teams, questions, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered } = gameState;
+  const { session, scores, teams, questions, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered, gameError } = gameState;
   const currentTeam = teams.find((t) => t.id === currentTeamId);
 
   useEffect(() => {
@@ -243,6 +243,29 @@ export default function Display() {
   }
 
   if (phase === "finished" || session.status === "finished") {
+    if (gameError === "not-enough-teams") {
+      return (
+        <div className="h-screen flex items-center justify-center relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+          {connectionBadge}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center gap-6 text-center px-8 max-w-xl"
+          >
+            <div className="w-24 h-24 rounded-full bg-red-500/20 flex items-center justify-center ring-4 ring-red-400/30">
+              <Users className="h-12 w-12 text-red-400" />
+            </div>
+            <h1 className={`text-4xl md:text-5xl font-bold text-white ${isRTL ? "font-arabic" : ""}`}>
+              {t("notEnoughTeams")}
+            </h1>
+            <p className={`text-xl text-white/60 leading-relaxed ${isRTL ? "font-arabic" : ""}`}>
+              {t("notEnoughTeamsDesc")}
+            </p>
+          </motion.div>
+        </div>
+      );
+    }
+
     return (
       <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
         {connectionBadge}
