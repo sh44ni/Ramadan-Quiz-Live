@@ -173,7 +173,7 @@ async function startEntryPhase() {
   gameState.entryTeams = [];
   gameState.gameError = null;
 
-  startTimer(60, async () => {
+  startTimer(90, async () => {
     await endEntryPhase();
   });
 
