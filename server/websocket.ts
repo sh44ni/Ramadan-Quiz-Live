@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { log } from "./index";
 
-type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "finished";
+type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "team-complete" | "finished";
 
 interface InMemoryGameState {
   phase: GamePhase;
@@ -173,7 +173,7 @@ async function startEntryPhase() {
   gameState.entryTeams = [];
   gameState.gameError = null;
 
-  startTimer(90, async () => {
+  startTimer(120, async () => {
     await endEntryPhase();
   });
 
@@ -194,11 +194,26 @@ async function endEntryPhase() {
   }
 
   const allTeams = await storage.getTeams();
-  gameState.teamOrder = [...gameState.entryTeams].sort((a, b) => {
-    const idxA = allTeams.findIndex((t) => t.id === a);
-    const idxB = allTeams.findIndex((t) => t.id === b);
-    return idxA - idxB;
-  });
+
+  const teamPlayOrder = [
+    "Ahl Al-Raya",
+    "Marsa Al-Fikr",
+    "Al-Fallah",
+    "Falaj Gharba",
+    "Al-Nukhba",
+    "Al-Bidaya",
+  ];
+
+  const getPlayPriority = (teamId: number) => {
+    const team = allTeams.find((t) => t.id === teamId);
+    if (!team) return 99;
+    const idx = teamPlayOrder.findIndex((name) => team.nameEn.includes(name));
+    return idx === -1 ? 99 : idx;
+  };
+
+  gameState.teamOrder = [...gameState.entryTeams].sort(
+    (a, b) => getPlayPriority(a) - getPlayPriority(b)
+  );
 
   const teams = allTeams;
   gameState.teamPlayers = {};
@@ -237,7 +252,7 @@ async function startSelectionPhase() {
 
   broadcast({ type: "phase-changed", phase: "selection", currentTeamId: getCurrentTeamId(), currentPlayerName: getCurrentPlayerName() });
 
-  startTimer(60, async () => {
+  startTimer(10, async () => {
     await handleSelectionTimeout();
   });
 
@@ -285,7 +300,7 @@ async function startPreparationPhase() {
 
   broadcast({ type: "phase-changed", phase: "preparation" });
 
-  startTimer(30, async () => {
+  startTimer(10, async () => {
     await startAnswerPhase();
   });
 
@@ -438,34 +453,28 @@ async function advanceToNextTurn() {
 
 async function advanceToNextTeam() {
   const nextTeamIndex = gameState.currentTeamIndex + 1;
+  const completedTeamId = gameState.teamOrder[gameState.currentTeamIndex];
 
   if (nextTeamIndex >= gameState.teamOrder.length) {
     const available = getAvailableNumbers();
     if (available.length > 0 && hasAnyTeamWithRemainingQuestions()) {
       gameState.currentTeamIndex = 0;
-      await startSelectionPhase();
     } else {
       await endGame();
+      return;
     }
-    return;
+  } else {
+    gameState.currentTeamIndex = nextTeamIndex;
   }
 
-  const completedTeamId = gameState.teamOrder[gameState.currentTeamIndex];
-  gameState.currentTeamIndex = nextTeamIndex;
-
   const nextTeamId = getCurrentTeamId()!;
-  broadcast({
-    type: "team-completed",
-    completedTeamId,
-    nextTeamId,
-  });
+
+  broadcast({ type: "team-completed", completedTeamId, nextTeamId });
   broadcast({ type: "turn-changed", teamId: nextTeamId });
 
+  gameState.phase = "team-complete";
+  broadcast({ type: "phase-changed", phase: "team-complete" });
   await broadcastFullState();
-
-  setTimeout(async () => {
-    await startSelectionPhase();
-  }, 3000);
 }
 
 function hasAnyTeamWithRemainingQuestions(): boolean {
@@ -631,8 +640,15 @@ async function handleMessage(ws: WebSocket, raw: string) {
         break;
       }
 
+      case "admin-next-team": {
+        if (gameState.phase === "team-complete") {
+          await startSelectionPhase();
+        }
+        break;
+      }
+
       case "admin-pause": {
-        if (gameState.phase === "idle" || gameState.phase === "finished" || gameState.phase === "paused") return;
+        if (gameState.phase === "idle" || gameState.phase === "finished" || gameState.phase === "paused" || gameState.phase === "team-complete") return;
         gameState.pausedPhase = gameState.phase;
         gameState.pausedTimerSeconds = gameState.timerSeconds;
         stopTimer();
@@ -761,6 +777,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
             await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
           }
           await advanceToNextTurn();
+        } else if (gameState.phase === "team-complete") {
+          await startSelectionPhase();
         }
         break;
       }

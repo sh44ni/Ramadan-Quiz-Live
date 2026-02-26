@@ -45,23 +45,25 @@ export default function Display() {
 
   const getTimerMax = () => {
     switch (phase) {
-      case "entry": return 60;
-      case "selection": return 60;
-      case "preparation": return 30;
+      case "entry": return 120;
+      case "selection": return 10;
+      case "preparation": return 10;
       case "answer": return 30;
       default: return 30;
     }
   };
 
   const getTimerColor = () => {
-    if (timer.seconds > 20) return "text-emerald-400";
-    if (timer.seconds > 10) return "text-amber-400";
+    const max = getTimerMax();
+    if (timer.seconds > max * 0.5) return "text-emerald-400";
+    if (timer.seconds > max * 0.25) return "text-amber-400";
     return "text-red-400";
   };
 
   const getTimerStroke = () => {
-    if (timer.seconds > 20) return "#10b981";
-    if (timer.seconds > 10) return "#f59e0b";
+    const max = getTimerMax();
+    if (timer.seconds > max * 0.5) return "#10b981";
+    if (timer.seconds > max * 0.25) return "#f59e0b";
     return "#ef4444";
   };
 
@@ -82,6 +84,7 @@ export default function Display() {
       case "preparation": return t("phasePreparation");
       case "answer": return t("phaseAnswer");
       case "paused": return t("paused");
+      case "team-complete": return t("teamCompletePhase");
       case "finished": return t("gameOver");
       default: return "";
     }
@@ -94,6 +97,7 @@ export default function Display() {
       case "preparation": return "bg-amber-500/30 text-amber-300 border-amber-400/30";
       case "answer": return "bg-emerald-500/30 text-emerald-300 border-emerald-400/30";
       case "paused": return "bg-orange-500/30 text-orange-300 border-orange-400/30";
+      case "team-complete": return "bg-cyan-500/30 text-cyan-300 border-cyan-400/30";
       default: return "bg-white/10 text-white/60";
     }
   };
@@ -185,7 +189,7 @@ export default function Display() {
                   fill="none"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
-                  animate={{ strokeDashoffset: circumference - ((timer.seconds / 60) * circumference) }}
+                  animate={{ strokeDashoffset: circumference - ((timer.seconds / 120) * circumference) }}
                   transition={{ duration: 0.5, ease: "linear" }}
                 />
               </svg>
@@ -235,6 +239,104 @@ export default function Display() {
                 );
               })}
             </div>
+          </motion.div>
+        </div>
+        {bannerSide}
+      </div>
+    );
+  }
+
+  if (phase === "team-complete") {
+    const completedTeam = teamCompleted ? teams.find((t) => t.id === teamCompleted.completedTeamId) : currentTeam;
+    const nextTeam = teams.find((t) => t.id === currentTeamId);
+    return (
+      <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+        {connectionBadge}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8 gap-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="flex flex-col items-center gap-6 p-10 rounded-3xl bg-emerald-500/10 border-2 border-emerald-400/25 backdrop-blur-sm max-w-2xl w-full"
+          >
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.6, repeat: 3 }}
+            >
+              <CheckCircle2 className="h-20 w-20 text-emerald-400" />
+            </motion.div>
+            {completedTeam && (
+              <div className="text-center">
+                <p className={`text-lg text-emerald-300/70 uppercase tracking-widest font-medium mb-1 ${isRTL ? "font-arabic" : ""}`}>
+                  {t("teamCompletePhase")}
+                </p>
+                <h1 className={`text-4xl md:text-5xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="display-completed-team">
+                  {language === "ar" ? completedTeam.nameAr : completedTeam.nameEn}
+                </h1>
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="flex flex-col items-center gap-4"
+          >
+            {nextTeam && (
+              <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <span className={`text-white/50 text-lg ${isRTL ? "font-arabic" : ""}`}>{t("upNext")}:</span>
+                <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: nextTeam.color }} />
+                <span className={`text-xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="display-next-team">
+                  {language === "ar" ? nextTeam.nameAr : nextTeam.nameEn}
+                </span>
+              </div>
+            )}
+            <motion.p
+              className={`text-white/40 text-base text-center ${isRTL ? "font-arabic" : ""}`}
+              animate={{ opacity: [0.4, 0.9, 0.4] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              data-testid="display-waiting-next-team"
+            >
+              {t("waitingForNextTeam")}
+            </motion.p>
+          </motion.div>
+        </div>
+        {bannerSide}
+      </div>
+    );
+  }
+
+  if (phase === "paused") {
+    return (
+      <div className="h-screen flex flex-row relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #122a4f 50%, #1a3a6e 100%)" }}>
+        {connectionBadge}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8 gap-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="flex flex-col items-center gap-6 p-12 rounded-3xl bg-orange-500/10 border-2 border-orange-400/25 backdrop-blur-sm"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.08, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <div className="w-24 h-24 rounded-full bg-orange-500/20 flex items-center justify-center ring-4 ring-orange-400/30">
+                <span className="text-5xl">⏸</span>
+              </div>
+            </motion.div>
+            <h1 className={`text-5xl md:text-6xl font-bold text-orange-300 ${isRTL ? "font-arabic" : ""}`} data-testid="display-paused-title">
+              {t("gamePausedTitle")}
+            </h1>
+            <motion.p
+              className={`text-xl text-white/50 ${isRTL ? "font-arabic" : ""}`}
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              data-testid="display-paused-subtitle"
+            >
+              {t("gamePausedSubtitle")}
+            </motion.p>
           </motion.div>
         </div>
         {bannerSide}

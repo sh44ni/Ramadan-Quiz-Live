@@ -106,6 +106,7 @@ export default function Admin() {
     adminAdjustScore,
     adminForceAdvance,
     adminTiebreaker,
+    adminNextTeam,
   } = useGameSocket();
 
   const [qbSearch, setQbSearch] = useState("");
@@ -483,6 +484,7 @@ export default function Admin() {
       case "preparation": return t("phasePreparation");
       case "answer": return t("phaseAnswer");
       case "paused": return t("paused");
+      case "team-complete": return t("teamCompletePhase");
       case "finished": return t("finished");
       default: return t("waiting");
     }
@@ -493,9 +495,11 @@ export default function Admin() {
       ? "bg-emerald-500"
       : gamePhase === "paused"
         ? "bg-amber-500"
-        : gamePhase === "finished"
-          ? "bg-red-500"
-          : "bg-muted-foreground";
+        : gamePhase === "team-complete"
+          ? "bg-cyan-500"
+          : gamePhase === "finished"
+            ? "bg-red-500"
+            : "bg-muted-foreground";
 
   const statusText = phaseLabel;
 
@@ -718,7 +722,18 @@ export default function Admin() {
               </Button>
             )}
 
-            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "entry" && (
+            {gamePhase === "team-complete" && (
+              <Button
+                className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold text-base"
+                onClick={() => { adminNextTeam(); }}
+                data-testid="button-next-team"
+              >
+                <Play className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("nextTeamBtn")}</span>
+              </Button>
+            )}
+
+            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "entry" && gamePhase !== "team-complete" && (
               <Button
                 variant="secondary"
                 onClick={() => { adminPause(); }}
@@ -739,7 +754,7 @@ export default function Admin() {
               </Button>
             )}
 
-            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "entry" && (
+            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "entry" && gamePhase !== "team-complete" && (
               <>
                 <Button
                   variant="secondary"
@@ -758,6 +773,17 @@ export default function Admin() {
                   <span className={isRTL ? "font-arabic" : ""}>{t("endGame")}</span>
                 </Button>
               </>
+            )}
+
+            {gamePhase === "team-complete" && (
+              <Button
+                variant="destructive"
+                onClick={() => { adminEnd(); }}
+                data-testid="button-end-team-complete"
+              >
+                <Square className="h-4 w-4" />
+                <span className={isRTL ? "font-arabic" : ""}>{t("endGame")}</span>
+              </Button>
             )}
 
             {gamePhase !== "idle" && (

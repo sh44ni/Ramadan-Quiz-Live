@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Team, Question, GameSession, TeamScore } from "@shared/schema";
 
-export type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "finished";
+export type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "team-complete" | "finished";
 
 export interface GameState {
   session: GameSession | null;
@@ -220,6 +220,7 @@ export function useGameSocket() {
   const adminAdjustScore = useCallback((teamId: number, points: number) => send({ type: "admin-adjust-score", teamId, points }), [send]);
   const adminForceAdvance = useCallback(() => send({ type: "admin-force-advance" }), [send]);
   const adminTiebreaker = useCallback((teamIds: number[]) => send({ type: "admin-tiebreaker", teamIds }), [send]);
+  const adminNextTeam = useCallback(() => send({ type: "admin-next-team" }), [send]);
 
   return {
     gameState,
@@ -241,5 +242,6 @@ export function useGameSocket() {
     adminAdjustScore,
     adminForceAdvance,
     adminTiebreaker,
+    adminNextTeam,
   };
 }
