@@ -369,6 +369,141 @@ const questionsData = [
     optionDEn: "Shamshir", optionDAr: "شمشير",
     correctAnswer: "c", categoryEn: "Omani Culture", categoryAr: "الثقافة العُمانية", difficulty: "easy",
   },
+  {
+    textEn: "In which year did the battle of Badr take place?",
+    textAr: "في أي سنة هجرية وقعت غزوة بدر الكبرى؟",
+    optionAEn: "1 AH", optionAAr: "السنة الأولى للهجرة",
+    optionBEn: "2 AH", optionBAr: "السنة الثانية للهجرة",
+    optionCEn: "3 AH", optionCAr: "السنة الثالثة للهجرة",
+    optionDEn: "4 AH", optionDAr: "السنة الرابعة للهجرة",
+    correctAnswer: "b", categoryEn: "Islamic History", categoryAr: "التاريخ الإسلامي", difficulty: "medium",
+  },
+  {
+    textEn: "What is the meaning of the Arabic word 'Jabal'?",
+    textAr: "ما معنى كلمة (جبل) في اللغة العربية؟",
+    optionAEn: "River", optionAAr: "نهر",
+    optionBEn: "Sea", optionBAr: "بحر",
+    optionCEn: "Mountain", optionCAr: "جبل",
+    optionDEn: "Desert", optionDAr: "صحراء",
+    correctAnswer: "c", categoryEn: "Arabic Language", categoryAr: "اللغة العربية", difficulty: "easy",
+  },
+  {
+    textEn: "Who built the famous Nizwa Fort?",
+    textAr: "من هو الإمام الذي بنى قلعة نزوى الشهيرة؟",
+    optionAEn: "Imam Sultan bin Saif Al Ya'rubi", optionAAr: "الإمام سلطان بن سيف اليعربي",
+    optionBEn: "Imam Ahmad bin Said", optionBAr: "الإمام أحمد بن سعيد",
+    optionCEn: "Imam Saif bin Sultan", optionCAr: "الإمام سيف بن سلطان",
+    optionDEn: "Imam Nasir bin Murshid", optionDAr: "الإمام ناصر بن مرشد",
+    correctAnswer: "a", categoryEn: "Omani Culture", categoryAr: "الثقافة العُمانية", difficulty: "medium",
+  },
+  {
+    textEn: "Which companion is known as 'The Sword of Allah'?",
+    textAr: "من هو الصحابي الجليل المُلقب بـ (سيف الله المسلول)؟",
+    optionAEn: "Ali ibn Abi Talib", optionAAr: "علي بن أبي طالب",
+    optionBEn: "Khalid ibn Al-Walid", optionBAr: "خالد بن الوليد",
+    optionCEn: "Umar ibn Al-Khattab", optionCAr: "عمر بن الخطاب",
+    optionDEn: "Hamza ibn Abdul-Muttalib", optionDAr: "حمزة بن عبدالمطلب",
+    correctAnswer: "b", categoryEn: "Islamic History", categoryAr: "التاريخ الإسلامي", difficulty: "medium",
+  },
+  {
+    textEn: "What is the hardest natural substance on Earth?",
+    textAr: "ما هي أصلب مادة طبيعية على وجه الأرض؟",
+    optionAEn: "Gold", optionAAr: "الذهب",
+    optionBEn: "Iron", optionBAr: "الحديد",
+    optionCEn: "Diamond", optionCAr: "الألماس",
+    optionDEn: "Platinum", optionDAr: "البلاتين",
+    correctAnswer: "c", categoryEn: "General Knowledge", categoryAr: "معلومات عامة", difficulty: "easy",
+  },
+  {
+    textEn: "What is the plural of the Arabic word 'Kitab' (book)?",
+    textAr: "ما هو جمع كلمة (كتاب)؟",
+    optionAEn: "Katabat", optionAAr: "كتبات",
+    optionBEn: "Maktabat", optionBAr: "مكتبات",
+    optionCEn: "Kutub", optionCAr: "كُتُب",
+    optionDEn: "Kuttab", optionDAr: "كُتّاب",
+    correctAnswer: "c", categoryEn: "Arabic Language", categoryAr: "اللغة العربية", difficulty: "easy",
+  },
+  {
+    textEn: "Which prophet was swallowed by a whale?",
+    textAr: "من هو النبي الذي ابتلعه الحوت؟",
+    optionAEn: "Yunus (Jonah)", optionAAr: "يونس عليه السلام",
+    optionBEn: "Ibrahim (Abraham)", optionBAr: "إبراهيم عليه السلام",
+    optionCEn: "Musa (Moses)", optionCAr: "موسى عليه السلام",
+    optionDEn: "Ayyub (Job)", optionDAr: "أيوب عليه السلام",
+    correctAnswer: "a", categoryEn: "Quran & Hadith", categoryAr: "القرآن والحديث", difficulty: "easy",
+  },
+  {
+    textEn: "What is the highest mountain peak in Oman?",
+    textAr: "ما هي أعلى قمة جبلية في سلطنة عُمان؟",
+    optionAEn: "Jabal Akhdar", optionAAr: "الجبل الأخضر",
+    optionBEn: "Jabal Shams", optionBAr: "جبل شمس",
+    optionCEn: "Jabal Samhan", optionCAr: "جبل سمحان",
+    optionDEn: "Jabal Misht", optionDAr: "جبل مشط",
+    correctAnswer: "b", categoryEn: "Omani Culture", categoryAr: "الثقافة العُمانية", difficulty: "medium",
+  },
+  {
+    textEn: "Who authored the Arabic dictionary 'Al-Ain'?",
+    textAr: "من هو مؤلف معجم (العين) في اللغة العربية؟",
+    optionAEn: "Al-Farahidi", optionAAr: "الخليل بن أحمد الفراهيدي",
+    optionBEn: "Sibawayh", optionBAr: "سيبويه",
+    optionCEn: "Al-Jahiz", optionCAr: "الجاحظ",
+    optionDEn: "Ibn Manzur", optionDAr: "ابن منظور",
+    correctAnswer: "a", categoryEn: "Arabic Language", categoryAr: "اللغة العربية", difficulty: "hard",
+  },
+  {
+    textEn: "In which city is the Kaaba located?",
+    textAr: "في أي مدينة تقع الكعبة المشرفة؟",
+    optionAEn: "Madinah", optionAAr: "المدينة المنورة",
+    optionBEn: "Jerusalem", optionBAr: "القدس",
+    optionCEn: "Mecca", optionCAr: "مكة المكرمة",
+    optionDEn: "Riyadh", optionDAr: "الرياض",
+    correctAnswer: "c", categoryEn: "Quran & Hadith", categoryAr: "القرآن والحديث", difficulty: "easy",
+  },
+  {
+    textEn: "Which country is famously known as the land of ascending dragon?",
+    textAr: "أي دولة تُعرف بلقب (أرض التنين الصاعد)؟",
+    optionAEn: "Japan", optionAAr: "اليابان",
+    optionBEn: "China", optionBAr: "الصين",
+    optionCEn: "South Korea", optionCAr: "كوريا الجنوبية",
+    optionDEn: "Vietnam", optionDAr: "فيتنام",
+    correctAnswer: "d", categoryEn: "General Knowledge", categoryAr: "معلومات عامة", difficulty: "hard",
+  },
+  {
+    textEn: "In the Battle of Khandaq (The Trench), who suggested digging the trench?",
+    textAr: "في غزوة الخندق (الأحزاب)، من الذي أشار على المسلمين بحفر الخندق؟",
+    optionAEn: "Uthman ibn Affan", optionAAr: "عثمان بن عفان",
+    optionBEn: "Salman Al-Farsi", optionBAr: "سلمان الفارسي",
+    optionCEn: "Abu Bakr", optionCAr: "أبو بكر الصديق",
+    optionDEn: "Zayd ibn Thabit", optionDAr: "زيد بن ثابت",
+    correctAnswer: "b", categoryEn: "Islamic History", categoryAr: "التاريخ الإسلامي", difficulty: "medium",
+  },
+  {
+    textEn: "Bahla Fort is a UNESCO World Heritage site. Where is it located?",
+    textAr: "قلعة بهلاء مدرجة ضمن التراث العالمي لليونسكو. في أي محافظة تقع؟",
+    optionAEn: "Muscat", optionAAr: "محافظة مسقط",
+    optionBEn: "Dhofar", optionBAr: "محافظة ظفار",
+    optionCEn: "Ad Dakhiliyah", optionCAr: "محافظة الداخلية",
+    optionDEn: "Al Batinah North", optionDAr: "محافظة شمال الباطنة",
+    correctAnswer: "c", categoryEn: "Omani Culture", categoryAr: "الثقافة العُمانية", difficulty: "medium",
+  },
+  {
+    textEn: "What is the speed of light in a vacuum?",
+    textAr: "كم تبلغ سرعة الضوء في الفراغ تقريباً؟",
+    optionAEn: "300,000 km/s", optionAAr: "٣٠٠,٠٠٠ كيلومتر في الثانية",
+    optionBEn: "150,000 km/s", optionBAr: "١٥٠,٠٠٠ كيلومتر في الثانية",
+    optionCEn: "1,000 km/s", optionCAr: "١,٠٠٠ كيلومتر في الثانية",
+    optionDEn: "3,000,000 km/s", optionDAr: "٣,٠٠٠,٠٠٠ كيلومتر في الثانية",
+    correctAnswer: "a", categoryEn: "General Knowledge", categoryAr: "معلومات عامة", difficulty: "medium",
+  },
+  {
+    textEn: "Which companion is known as the translator of the Quran?",
+    textAr: "من هو الصحابي المُلقب بـ (ترجمان القرآن)؟",
+    optionAEn: "Abdullah ibn Masud", optionAAr: "عبدالله بن مسعود",
+    optionBEn: "Abdullah ibn Abbas", optionBAr: "عبدالله بن عباس",
+    optionCEn: "Ali ibn Abi Talib", optionCAr: "علي بن أبي طالب",
+    optionDEn: "Ubayy ibn Ka'b", optionDAr: "أُبي بن كعب",
+    correctAnswer: "b", categoryEn: "Quran & Hadith", categoryAr: "القرآن والحديث", difficulty: "medium",
+  }
 ];
 
 export async function seedDatabase() {
@@ -391,9 +526,17 @@ export async function seedDatabase() {
       }
       log("Team names synced successfully", "seed");
 
-      if (existingQuestions.length === 0) {
-        await db.insert(questions).values(questionsData);
-        log(`Inserted ${questionsData.length} questions`, "seed");
+      if (existingQuestions.length < questionsData.length) {
+        log(`Found ${existingQuestions.length} questions. Inserting new ones...`, "seed");
+
+        // Find which questions are missing by comparing textEn
+        const existingTexts = new Set(existingQuestions.map(q => q.textEn));
+        const newQuestions = questionsData.filter(q => !existingTexts.has(q.textEn));
+
+        if (newQuestions.length > 0) {
+          await db.insert(questions).values(newQuestions);
+          log(`Inserted ${newQuestions.length} new questions`, "seed");
+        }
       }
       return;
     }
@@ -403,9 +546,13 @@ export async function seedDatabase() {
     await db.insert(teams).values(teamsData);
     log(`Inserted ${teamsData.length} teams`, "seed");
 
-    if (existingQuestions.length === 0) {
-      await db.insert(questions).values(questionsData);
-      log(`Inserted ${questionsData.length} questions`, "seed");
+    if (existingQuestions.length < questionsData.length) {
+      const existingTexts = new Set(existingQuestions.map(q => q.textEn));
+      const newQuestions = questionsData.filter(q => !existingTexts.has(q.textEn));
+      if (newQuestions.length > 0) {
+        await db.insert(questions).values(newQuestions);
+        log(`Inserted ${newQuestions.length} new questions`, "seed");
+      }
     }
 
     log("Database seeding complete!", "seed");

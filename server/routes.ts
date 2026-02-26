@@ -11,7 +11,7 @@ const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
 const adminTokens = new Set<string>();
 const playerTokens = new Map<string, string>();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_123456789");
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const token = req.headers["x-admin-token"] as string;
