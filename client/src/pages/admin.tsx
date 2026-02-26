@@ -140,6 +140,17 @@ export default function Admin() {
   } | null>(null);
   const [editValues, setEditValues] = useState<{ nameEn?: string; nameAr?: string; value?: string }>({});
 
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const handleWsAction = (actionName: string, actionFn: () => void) => {
+    setActionLoading(actionName);
+    actionFn();
+    setTimeout(() => {
+      setActionLoading(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/game/current"] });
+    }, 1500);
+  };
+
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
       method,
@@ -476,9 +487,10 @@ export default function Admin() {
                 className="w-full gold-gradient border-amber-400/30 text-white font-bold"
                 onClick={() => loginMutation.mutate()}
                 disabled={loginMutation.isPending || !password}
+                isLoading={loginMutation.isPending}
                 data-testid="button-admin-login"
               >
-                {loginMutation.isPending ? "..." : t("login")}
+                {loginMutation.isPending ? t("loading") : t("login")}
               </Button>
             </div>
 
@@ -517,7 +529,7 @@ export default function Admin() {
       <div className="p-4 md:p-6 space-y-4 islamic-pattern">
         <Skeleton className="h-12 w-full rounded-md" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
         </div>
         <Skeleton className="h-64 w-full rounded-md" />
       </div>
@@ -669,13 +681,12 @@ export default function Admin() {
             <div className="p-3 rounded-md bg-muted/30 space-y-2 mb-2">
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("currentPhase")}</span>
-                <Badge className={`text-xs ${
-                  gamePhase === "entry" ? "bg-purple-500/15 text-purple-600" :
+                <Badge className={`text-xs ${gamePhase === "entry" ? "bg-purple-500/15 text-purple-600" :
                   gamePhase === "selection" ? "bg-blue-500/15 text-blue-600" :
-                  gamePhase === "preparation" ? "bg-amber-500/15 text-amber-600" :
-                  gamePhase === "answer" ? "bg-emerald-500/15 text-emerald-600" :
-                  "bg-orange-500/15 text-orange-600"
-                }`}>{phaseLabel}</Badge>
+                    gamePhase === "preparation" ? "bg-amber-500/15 text-amber-600" :
+                      gamePhase === "answer" ? "bg-emerald-500/15 text-emerald-600" :
+                        "bg-orange-500/15 text-orange-600"
+                  }`}>{phaseLabel}</Badge>
               </div>
               {currentTeam && (
                 <div className="flex items-center gap-2">
@@ -733,8 +744,9 @@ export default function Admin() {
                 })}
               </div>
               <Button
-                onClick={() => { if (tiebreakerTeams.length >= 2) { adminTiebreaker(tiebreakerTeams); setTiebreakerTeams([]); } }}
-                disabled={tiebreakerTeams.length < 2}
+                onClick={() => { if (tiebreakerTeams.length >= 2) { handleWsAction("tiebreaker", () => adminTiebreaker(tiebreakerTeams)); setTiebreakerTeams([]); } }}
+                disabled={tiebreakerTeams.length < 2 || actionLoading !== null}
+                isLoading={actionLoading === "tiebreaker"}
                 size="sm"
                 className="w-full bg-amber-500/20 text-amber-700 border-amber-400/30"
                 data-testid="button-tiebreaker"
@@ -748,7 +760,9 @@ export default function Admin() {
           <div className="grid grid-cols-2 gap-2">
             {(gamePhase === "idle" || gamePhase === "finished") && (
               <Button
-                onClick={() => { adminStart(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                onClick={() => handleWsAction("start", adminStart)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "start"}
                 className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold"
                 data-testid="button-start-game"
               >
@@ -759,7 +773,9 @@ export default function Admin() {
 
             {gamePhase === "entry" && (
               <Button
-                onClick={() => { adminSkipEntry(); }}
+                onClick={() => handleWsAction("skip-entry", adminSkipEntry)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "skip-entry"}
                 className="col-span-2"
                 variant="secondary"
                 data-testid="button-skip-entry"
@@ -772,7 +788,9 @@ export default function Admin() {
             {gamePhase === "team-complete" && (
               <Button
                 className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold text-base"
-                onClick={() => { adminNextTeam(); }}
+                onClick={() => handleWsAction("next-team", adminNextTeam)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "next-team"}
                 data-testid="button-next-team"
               >
                 <Play className="h-4 w-4" />
@@ -783,7 +801,9 @@ export default function Admin() {
             {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "entry" && gamePhase !== "team-complete" && (
               <Button
                 variant="secondary"
-                onClick={() => { adminPause(); }}
+                onClick={() => handleWsAction("pause", adminPause)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "pause"}
                 data-testid="button-pause"
               >
                 <Pause className="h-4 w-4" />
@@ -793,7 +813,9 @@ export default function Admin() {
 
             {gamePhase === "paused" && (
               <Button
-                onClick={() => { adminResume(); }}
+                onClick={() => handleWsAction("resume", adminResume)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "resume"}
                 data-testid="button-resume"
               >
                 <Play className="h-4 w-4" />
@@ -805,7 +827,9 @@ export default function Admin() {
               <>
                 <Button
                   variant="secondary"
-                  onClick={() => { adminForceAdvance(); }}
+                  onClick={() => handleWsAction("force-advance", adminForceAdvance)}
+                  disabled={actionLoading !== null}
+                  isLoading={actionLoading === "force-advance"}
                   data-testid="button-force-advance"
                 >
                   <SkipForward className="h-4 w-4" />
@@ -813,7 +837,9 @@ export default function Admin() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => { adminEnd(); }}
+                  onClick={() => handleWsAction("end", adminEnd)}
+                  disabled={actionLoading !== null}
+                  isLoading={actionLoading === "end"}
                   data-testid="button-end"
                 >
                   <Square className="h-4 w-4" />
@@ -825,7 +851,9 @@ export default function Admin() {
             {gamePhase === "team-complete" && (
               <Button
                 variant="destructive"
-                onClick={() => { adminEnd(); }}
+                onClick={() => handleWsAction("end", adminEnd)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "end"}
                 data-testid="button-end-team-complete"
               >
                 <Square className="h-4 w-4" />
@@ -836,7 +864,9 @@ export default function Admin() {
             {gamePhase !== "idle" && (
               <Button
                 variant="outline"
-                onClick={() => { adminReset(); setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/game/current"] }), 500); }}
+                onClick={() => handleWsAction("reset", adminReset)}
+                disabled={actionLoading !== null}
+                isLoading={actionLoading === "reset"}
                 data-testid="button-reset"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -980,11 +1010,10 @@ export default function Admin() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className={`flex items-center justify-center gap-2 p-3 rounded-md font-bold ${
-                  wsAnswerResult.isCorrect
-                    ? "bg-emerald-500/15 text-emerald-600"
-                    : "bg-red-500/15 text-red-600"
-                }`}
+                className={`flex items-center justify-center gap-2 p-3 rounded-md font-bold ${wsAnswerResult.isCorrect
+                  ? "bg-emerald-500/15 text-emerald-600"
+                  : "bg-red-500/15 text-red-600"
+                  }`}
               >
                 {wsAnswerResult.isCorrect ? (
                   <><CheckCircle2 className="h-5 w-5" /> {t("correct")} +1</>
@@ -1160,9 +1189,9 @@ export default function Admin() {
                         }
                       }}
                       disabled={createQuestionMutation.isPending || updateQuestionMutation.isPending || !qbForm.textEn || !qbForm.textAr}
+                      isLoading={createQuestionMutation.isPending || updateQuestionMutation.isPending}
                       data-testid="button-save-question"
                     >
-                      {(createQuestionMutation.isPending || updateQuestionMutation.isPending) ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                       <span className={isRTL ? "font-arabic" : ""}>{qbEditingId ? t("updateQuestion") : t("saveQuestion")}</span>
                     </Button>
                     <Button
@@ -1284,8 +1313,8 @@ export default function Admin() {
                   if (qbDifficultyFilter !== "all" && q.difficulty !== qbDifficultyFilter) return false;
                   return true;
                 }).length === 0 && (
-                  <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>{t("noQuestionsFound")}</p>
-                )}
+                    <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>{t("noQuestionsFound")}</p>
+                  )}
               </div>
 
               <div className="border-t pt-3">
@@ -1307,9 +1336,10 @@ export default function Admin() {
                         size="sm"
                         onClick={() => createCategoryMutation.mutate()}
                         disabled={createCategoryMutation.isPending || !catFormNameEn || !catFormNameAr}
+                        isLoading={createCategoryMutation.isPending}
                         data-testid="button-add-category"
                       >
-                        {createCategoryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        {!createCategoryMutation.isPending && <Plus className="h-3 w-3" />}
                         <span className={isRTL ? "font-arabic" : ""}>{t("addCategory")}</span>
                       </Button>
                     </div>
@@ -1519,8 +1549,8 @@ export default function Admin() {
                             data-testid={`input-team-name-ar-${team.id}`}
                           />
                           <div className="flex gap-1">
-                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveName} disabled={isSaving} data-testid={`button-save-name-${team.id}`}>
-                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveName} disabled={isSaving} isLoading={isSaving} data-testid={`button-save-name-${team.id}`}>
+                              {t("save")}
                             </Button>
                             <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
                           </div>
@@ -1550,8 +1580,8 @@ export default function Admin() {
                             />
                           </div>
                           <div className="flex gap-1 ps-4">
-                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveCaptain} disabled={isSaving} data-testid={`button-save-captain-${team.id}`}>
-                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveCaptain} disabled={isSaving} isLoading={isSaving} data-testid={`button-save-captain-${team.id}`}>
+                              {t("save")}
                             </Button>
                             <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
                           </div>
@@ -1577,8 +1607,8 @@ export default function Admin() {
                               data-testid={`input-member-${team.id}-${idx}`}
                             />
                             <div className="flex gap-1">
-                              <Button size="sm" className="h-6 text-xs px-2" onClick={() => saveMember(idx)} disabled={isSaving} data-testid={`button-save-member-${team.id}-${idx}`}>
-                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                              <Button size="sm" className="h-6 text-xs px-2" onClick={() => saveMember(idx)} disabled={isSaving} isLoading={isSaving} data-testid={`button-save-member-${team.id}-${idx}`}>
+                                {t("save")}
                               </Button>
                               <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
                             </div>
@@ -1640,9 +1670,10 @@ export default function Admin() {
                 size="sm"
                 onClick={() => bulkImportMutation.mutate()}
                 disabled={bulkImportMutation.isPending || !bulkText.trim()}
+                isLoading={bulkImportMutation.isPending}
                 data-testid="button-bulk-import"
               >
-                {bulkImportMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {!bulkImportMutation.isPending && <Upload className="h-3 w-3" />}
                 <span className={isRTL ? "font-arabic" : ""}>{t("importEmails")}</span>
               </Button>
             </motion.div>
@@ -1709,10 +1740,11 @@ export default function Admin() {
               <Button
                 onClick={() => addEmailMutation.mutate()}
                 disabled={addEmailMutation.isPending || !newEmail.trim() || !newName.trim()}
+                isLoading={addEmailMutation.isPending}
                 className="shrink-0"
                 data-testid="button-add-email"
               >
-                {addEmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {!addEmailMutation.isPending && <Plus className="h-4 w-4" />}
                 <span className={isRTL ? "font-arabic" : ""}>{t("addEmail")}</span>
               </Button>
             </div>
@@ -1769,18 +1801,20 @@ export default function Admin() {
                         sendInvitationMutation.mutate({ email: entry.email, name: entry.name })
                       }
                       disabled={sendInvitationMutation.isPending}
+                      isLoading={sendInvitationMutation.isPending}
                       data-testid={`button-send-invitation-${entry.id}`}
                     >
-                      <Send className="h-3 w-3" />
+                      {!sendInvitationMutation.isPending && <Send className="h-3 w-3" />}
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => removeEmailMutation.mutate(entry.id)}
                       disabled={removeEmailMutation.isPending}
+                      isLoading={removeEmailMutation.isPending}
                       data-testid={`button-remove-email-${entry.id}`}
                     >
-                      <Trash2 className="h-3 w-3 text-destructive" />
+                      {!removeEmailMutation.isPending && <Trash2 className="h-3 w-3 text-destructive" />}
                     </Button>
                   </div>
                 </motion.div>

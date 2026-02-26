@@ -42,6 +42,7 @@ export default function Game() {
   const [playerTeamId, setPlayerTeamId] = useState<number | null>(null);
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [lastQuestionId, setLastQuestionId] = useState<number | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
 
   const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion, joinTeam } = useGameSocket();
   const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, teamPlayers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered } = gameState;
@@ -115,10 +116,14 @@ export default function Game() {
     [currentQuestion, session, submitAnswer, currentTeamId, phase],
   );
 
+  const [isAnswering, setIsAnswering] = useState(false);
+
   const handleSelectQuestionNumber = useCallback(
     (questionNumber: number) => {
       if (!playerTeamId || phase !== "selection") return;
+      setIsAnswering(true);
       selectQuestion(questionNumber, playerTeamId, playerName || "");
+      setTimeout(() => setIsAnswering(false), 2000);
     },
     [playerTeamId, playerName, phase, selectQuestion],
   );
@@ -296,12 +301,19 @@ export default function Game() {
             </Badge>
           ) : (
             <Button
-              onClick={() => playerTeamId && joinTeam(playerTeamId)}
+              onClick={() => {
+                if (playerTeamId) {
+                  setIsJoining(true);
+                  joinTeam(playerTeamId);
+                  setTimeout(() => setIsJoining(false), 2000);
+                }
+              }}
               className="gold-gradient border-amber-400/30 text-white font-bold text-lg px-8 py-3"
-              disabled={!playerTeamId}
+              disabled={!playerTeamId || isJoining}
+              isLoading={isJoining}
               data-testid="button-join-team"
             >
-              <Users className="h-5 w-5" />
+              {!isJoining && <Users className="h-5 w-5" />}
               <span className={isRTL ? "font-arabic" : ""}>{t("joinGame")}</span>
             </Button>
           )}
@@ -455,9 +467,8 @@ export default function Game() {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span
-                    className={`text-2xl font-bold tabular-nums ${
-                      timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
-                    } ${timer.seconds <= 5 && timer.running ? "animate-pulse" : ""}`}
+                    className={`text-2xl font-bold tabular-nums ${timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                      } ${timer.seconds <= 5 && timer.running ? "animate-pulse" : ""}`}
                     data-testid="text-timer"
                   >
                     {timer.seconds}
@@ -467,9 +478,8 @@ export default function Game() {
               <div className="flex-1 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium text-muted-foreground">{getPhaseLabel()}</span>
-                  <span className={`text-xs font-medium ${
-                    timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
-                  }`}>
+                  <span className={`text-xs font-medium ${timer.seconds > 20 ? "text-emerald-500" : timer.seconds > 10 ? "text-amber-500" : "text-red-500"
+                    }`}>
                     {timer.running
                       ? (timer.seconds > 20 ? t("plentyOfTime") : timer.seconds > 10 ? t("hurryUp") : t("almostOut"))
                       : ""
@@ -478,9 +488,8 @@ export default function Game() {
                 </div>
                 <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
                   <motion.div
-                    className={`h-full rounded-full transition-colors duration-500 ${
-                      timer.seconds > 20 ? "bg-emerald-500" : timer.seconds > 10 ? "bg-amber-500" : "bg-red-500"
-                    }`}
+                    className={`h-full rounded-full transition-colors duration-500 ${timer.seconds > 20 ? "bg-emerald-500" : timer.seconds > 10 ? "bg-amber-500" : "bg-red-500"
+                      }`}
                     animate={{ width: `${(timer.seconds / getTimerMax()) * 100}%` }}
                     transition={{ duration: 0.3, ease: "linear" }}
                   />
@@ -523,17 +532,23 @@ export default function Game() {
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: num * 0.01 }}
-                            onClick={() => !isUsed && handleSelectQuestionNumber(num)}
-                            disabled={isUsed}
-                            className={`aspect-square rounded-xl border-2 text-xl font-bold transition-all ${
-                              isUsed
-                                ? "bg-muted/30 border-transparent opacity-40 cursor-not-allowed text-muted-foreground"
-                                : "bg-card border-amber-400/40 hover:border-amber-400 hover:bg-amber-500/10 hover:shadow-lg cursor-pointer active:scale-95 text-foreground"
-                            }`}
+                            onClick={() => {
+                              if (!isUsed) {
+                                setSelectedAnswer(num.toString());
+                                handleSelectQuestionNumber(num);
+                              }
+                            }}
+                            disabled={isUsed || isAnswering}
+                            className={`aspect-square rounded-xl border-2 text-xl font-bold transition-all flex items-center justify-center ${isUsed
+                              ? "bg-muted/30 border-transparent opacity-40 cursor-not-allowed text-muted-foreground"
+                              : "bg-card border-amber-400/40 hover:border-amber-400 hover:bg-amber-500/10 hover:shadow-lg cursor-pointer active:scale-95 text-foreground"
+                              }`}
                             data-testid={`button-question-number-${num}`}
                           >
                             {isUsed ? (
                               <CheckCircle2 className="h-5 w-5 mx-auto text-muted-foreground" />
+                            ) : isAnswering && selectedAnswer === num.toString() ? (
+                              <div className="h-5 w-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                             ) : (
                               num
                             )}
@@ -576,7 +591,7 @@ export default function Game() {
                   <QuestionDisplay
                     question={currentQuestion}
                     questionNumber={0}
-                    onAnswer={() => {}}
+                    onAnswer={() => { }}
                     showResult={null}
                     correctAnswer={null}
                     disabled={true}

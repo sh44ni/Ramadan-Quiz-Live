@@ -123,9 +123,9 @@ export default function Login() {
                   className="w-full gold-gradient border-amber-400/30 text-white font-bold"
                   onClick={handleRequestOtp}
                   disabled={isLoading || !email.trim()}
+                  isLoading={isLoading}
                   data-testid="button-request-otp"
                 >
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   <span className={isRTL ? "font-arabic" : ""}>{t("sendOtp")}</span>
                 </Button>
               </motion.div>
@@ -156,9 +156,9 @@ export default function Login() {
                   className="w-full gold-gradient border-amber-400/30 text-white font-bold"
                   onClick={handleVerifyOtp}
                   disabled={isLoading || otp.length !== 6}
+                  isLoading={isLoading}
                   data-testid="button-verify-otp"
                 >
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   <span className={isRTL ? "font-arabic" : ""}>{t("verifyOtp")}</span>
                 </Button>
                 <Button
