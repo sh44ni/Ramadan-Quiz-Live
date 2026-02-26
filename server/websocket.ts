@@ -318,13 +318,13 @@ async function startAnswerPhase() {
 async function handleAnswerTimeout() {
   log(`Answer timeout fired: selectedQ=${gameState.selectedQuestionId}, session=${gameState.sessionId}`, "ws");
   if (!gameState.selectedQuestionId || !gameState.sessionId) {
-    await advanceToNextPlayer();
+    await advanceToNextTurn();
     return;
   }
 
   const question = await storage.getQuestion(gameState.selectedQuestionId);
   if (!question) {
-    await advanceToNextPlayer();
+    await advanceToNextTurn();
     return;
   }
 

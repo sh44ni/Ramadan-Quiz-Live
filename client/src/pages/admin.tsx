@@ -107,6 +107,7 @@ export default function Admin() {
     adminForceAdvance,
     adminTiebreaker,
     adminNextTeam,
+    adminSetTeamOrder,
   } = useGameSocket();
 
   const [qbSearch, setQbSearch] = useState("");

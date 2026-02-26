@@ -681,7 +681,7 @@ export default function Display() {
                     )}
                   </AnimatePresence>
                 </motion.div>
-              ) : (phase !== "selection" && phase !== "entry") && (
+              ) : (phase !== "selection") && (
                 <motion.div
                   key="waiting-question"
                   initial={{ opacity: 0 }}

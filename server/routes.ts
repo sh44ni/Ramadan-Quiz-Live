@@ -42,7 +42,7 @@ export async function registerRoutes(
 
   app.patch("/api/teams/:id", requireAdmin, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const { nameEn, nameAr, captain, members } = req.body;
       const data: Record<string, unknown> = {};
       if (nameEn !== undefined) data.nameEn = nameEn;
