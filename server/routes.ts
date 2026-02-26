@@ -40,6 +40,23 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/teams/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { nameEn, nameAr, captain, members } = req.body;
+      const data: Record<string, unknown> = {};
+      if (nameEn !== undefined) data.nameEn = nameEn;
+      if (nameAr !== undefined) data.nameAr = nameAr;
+      if (captain !== undefined) data.captain = captain;
+      if (members !== undefined) data.members = members;
+      const updated = await storage.updateTeam(id, data);
+      if (!updated) return res.status(404).json({ message: "Team not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update team" });
+    }
+  });
+
   app.get("/api/questions", async (_req, res) => {
     try {
       const questions = await storage.getQuestions();

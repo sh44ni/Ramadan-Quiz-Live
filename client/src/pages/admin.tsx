@@ -132,6 +132,12 @@ export default function Admin() {
   const [tiebreakerTeams, setTiebreakerTeams] = useState<number[]>([]);
   const [orderedTeamIds, setOrderedTeamIds] = useState<number[]>([]);
   const [orderSavedFlash, setOrderSavedFlash] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<{
+    teamId: number;
+    field: "name" | "captain" | "member";
+    memberIndex?: number;
+  } | null>(null);
+  const [editValues, setEditValues] = useState<{ nameEn?: string; nameAr?: string; value?: string }>({});
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -378,6 +384,21 @@ export default function Admin() {
       setBulkText("");
       setShowBulk(false);
       toast({ title: t("imported"), description: t("importedDesc") });
+    },
+  });
+
+  const updateTeamMutation = useMutation({
+    mutationFn: async ({ teamId, data }: { teamId: number; data: Record<string, unknown> }) => {
+      const res = await adminFetch("PATCH", `/api/teams/${teamId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      setEditingTeam(null);
+      setEditValues({});
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update team", variant: "destructive" });
     },
   });
 
@@ -1442,39 +1463,139 @@ export default function Admin() {
             {t("teamRoster")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {teams.map((team: Team) => (
-              <Card key={team.id} className="p-0 overflow-visible relative">
-                <div
-                  className="absolute top-0 left-0 right-0 h-1 rounded-t-md"
-                  style={{ backgroundColor: team.color }}
-                />
-                <div className="p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0"
-                      style={{ backgroundColor: team.color }}
-                    >
-                      <Users className="h-3 w-3" />
-                    </div>
-                    <span className={`text-sm font-bold ${isRTL ? "font-arabic" : ""}`}>
-                      {language === "ar" ? team.nameAr : team.nameEn}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs p-1.5 rounded bg-amber-500/10">
-                      <Crown className="h-3 w-3 text-amber-500 shrink-0" />
-                      <span className="font-arabic font-medium">{team.captain}</span>
-                    </div>
-                    {team.members && team.members.map((member, idx) => (
-                      <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground ps-4">
-                        <div className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
-                        <span className="font-arabic">{member}</span>
+            {teams.map((team: Team) => {
+              const isEditingName = editingTeam?.teamId === team.id && editingTeam.field === "name";
+              const isEditingCaptain = editingTeam?.teamId === team.id && editingTeam.field === "captain";
+              const isSaving = updateTeamMutation.isPending;
+
+              const startEditName = () => {
+                setEditingTeam({ teamId: team.id, field: "name" });
+                setEditValues({ nameEn: team.nameEn, nameAr: team.nameAr });
+              };
+              const startEditCaptain = () => {
+                setEditingTeam({ teamId: team.id, field: "captain" });
+                setEditValues({ value: team.captain });
+              };
+              const startEditMember = (idx: number) => {
+                setEditingTeam({ teamId: team.id, field: "member", memberIndex: idx });
+                setEditValues({ value: team.members?.[idx] || "" });
+              };
+              const cancelEdit = () => { setEditingTeam(null); setEditValues({}); };
+
+              const saveName = () => updateTeamMutation.mutate({ teamId: team.id, data: { nameEn: editValues.nameEn, nameAr: editValues.nameAr } });
+              const saveCaptain = () => updateTeamMutation.mutate({ teamId: team.id, data: { captain: editValues.value } });
+              const saveMember = (idx: number) => {
+                const newMembers = [...(team.members || [])];
+                newMembers[idx] = editValues.value || "";
+                updateTeamMutation.mutate({ teamId: team.id, data: { members: newMembers } });
+              };
+
+              return (
+                <Card key={team.id} className="p-0 overflow-visible relative">
+                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-md" style={{ backgroundColor: team.color }} />
+                  <div className="p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: team.color }}>
+                        <Users className="h-3 w-3" />
                       </div>
-                    ))}
+                      {isEditingName ? (
+                        <div className="flex-1 space-y-1.5">
+                          <Input
+                            value={editValues.nameEn || ""}
+                            onChange={(e) => setEditValues((v) => ({ ...v, nameEn: e.target.value }))}
+                            placeholder="English name"
+                            className="h-7 text-xs"
+                            dir="ltr"
+                            data-testid={`input-team-name-en-${team.id}`}
+                          />
+                          <Input
+                            value={editValues.nameAr || ""}
+                            onChange={(e) => setEditValues((v) => ({ ...v, nameAr: e.target.value }))}
+                            placeholder="الاسم بالعربية"
+                            className="h-7 text-xs font-arabic"
+                            dir="rtl"
+                            data-testid={`input-team-name-ar-${team.id}`}
+                          />
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveName} disabled={isSaving} data-testid={`button-save-name-${team.id}`}>
+                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className={`text-sm font-bold flex-1 ${isRTL ? "font-arabic" : ""}`}>
+                            {language === "ar" ? team.nameAr : team.nameEn}
+                          </span>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={startEditName} data-testid={`button-edit-name-${team.id}`}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {isEditingCaptain ? (
+                        <div className="space-y-1 p-1.5 rounded bg-amber-500/10">
+                          <div className="flex items-center gap-1">
+                            <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                            <Input
+                              value={editValues.value || ""}
+                              onChange={(e) => setEditValues((v) => ({ ...v, value: e.target.value }))}
+                              className="h-6 text-xs font-arabic flex-1"
+                              dir="rtl"
+                              data-testid={`input-captain-${team.id}`}
+                            />
+                          </div>
+                          <div className="flex gap-1 ps-4">
+                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveCaptain} disabled={isSaving} data-testid={`button-save-captain-${team.id}`}>
+                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs p-1.5 rounded bg-amber-500/10">
+                          <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                          <span className="font-arabic font-medium flex-1">{team.captain}</span>
+                          <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={startEditCaptain} data-testid={`button-edit-captain-${team.id}`}>
+                            <Pencil className="h-2.5 w-2.5" />
+                          </Button>
+                        </div>
+                      )}
+                      {team.members && team.members.map((member, idx) => {
+                        const isEditingThisMember = editingTeam?.teamId === team.id && editingTeam.field === "member" && editingTeam.memberIndex === idx;
+                        return isEditingThisMember ? (
+                          <div key={idx} className="flex flex-col gap-1 ps-4">
+                            <Input
+                              value={editValues.value || ""}
+                              onChange={(e) => setEditValues((v) => ({ ...v, value: e.target.value }))}
+                              className="h-6 text-xs font-arabic"
+                              dir="rtl"
+                              data-testid={`input-member-${team.id}-${idx}`}
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-6 text-xs px-2" onClick={() => saveMember(idx)} disabled={isSaving} data-testid={`button-save-member-${team.id}-${idx}`}>
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("save")}
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground ps-4">
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/40 shrink-0" />
+                            <span className="font-arabic flex-1">{member}</span>
+                            <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => startEditMember(idx)} data-testid={`button-edit-member-${team.id}-${idx}`}>
+                              <Pencil className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         </Card>
 
