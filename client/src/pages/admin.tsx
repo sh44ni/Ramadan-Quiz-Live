@@ -402,6 +402,30 @@ export default function Admin() {
     },
   });
 
+  const teams = teamsData || wsGameState.teams || [];
+
+  useEffect(() => {
+    if (teams.length === 0) return;
+    if (wsGameState.customTeamOrder && wsGameState.customTeamOrder.length > 0) {
+      setOrderedTeamIds(wsGameState.customTeamOrder);
+    } else if (orderedTeamIds.length === 0) {
+      setOrderedTeamIds([...teams].sort((a: Team, b: Team) => a.id - b.id).map((t: Team) => t.id));
+    }
+  }, [teams, wsGameState.customTeamOrder]);
+
+  const moveTeamInOrder = useCallback((index: number, direction: -1 | 1) => {
+    setOrderedTeamIds((prev) => {
+      const next = [...prev];
+      const swap = index + direction;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[index], next[swap]] = [next[swap], next[index]];
+      adminSetTeamOrder(next);
+      setOrderSavedFlash(true);
+      setTimeout(() => setOrderSavedFlash(false), 1500);
+      return next;
+    });
+  }, [adminSetTeamOrder]);
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-[calc(100vh-52px)] flex items-center justify-center ramadan-gradient relative overflow-hidden">
@@ -474,7 +498,6 @@ export default function Admin() {
 
   const session = wsGameState.session;
   const scores = wsGameState.scores || [];
-  const teams = teamsData || wsGameState.teams || [];
   const authorizedEmails = authorizedEmailsData || [];
   const allQuestions = questionsData || wsGameState.questions || [];
   const totalQuestions = wsGameState.totalQuestions || allQuestions.length || 31;
@@ -485,28 +508,6 @@ export default function Admin() {
   const currentTeam = teams.find((t: Team) => t.id === wsGameState.currentTeamId);
   const currentPlayerName = wsGameState.currentPlayerName;
   const gamePhase = wsGameState.phase;
-
-  useEffect(() => {
-    if (teams.length === 0) return;
-    if (wsGameState.customTeamOrder && wsGameState.customTeamOrder.length > 0) {
-      setOrderedTeamIds(wsGameState.customTeamOrder);
-    } else if (orderedTeamIds.length === 0) {
-      setOrderedTeamIds([...teams].sort((a, b) => a.id - b.id).map((t) => t.id));
-    }
-  }, [teams, wsGameState.customTeamOrder]);
-
-  const moveTeamInOrder = useCallback((index: number, direction: -1 | 1) => {
-    setOrderedTeamIds((prev) => {
-      const next = [...prev];
-      const swap = index + direction;
-      if (swap < 0 || swap >= next.length) return prev;
-      [next[index], next[swap]] = [next[swap], next[index]];
-      adminSetTeamOrder(next);
-      setOrderSavedFlash(true);
-      setTimeout(() => setOrderSavedFlash(false), 1500);
-      return next;
-    });
-  }, [adminSetTeamOrder]);
 
   const isLoading = teamsLoading;
 
