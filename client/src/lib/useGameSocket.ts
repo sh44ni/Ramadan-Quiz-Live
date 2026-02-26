@@ -24,6 +24,7 @@ export interface GameState {
   currentTeamIndex: number;
   teamOrder: number[];
   gameError: string | null;
+  customTeamOrder: number[];
 }
 
 interface TimerState {
@@ -66,6 +67,7 @@ const defaultState: GameState = {
   currentTeamIndex: 0,
   teamOrder: [],
   gameError: null,
+  customTeamOrder: [],
 };
 
 export function useGameSocket() {
@@ -221,6 +223,7 @@ export function useGameSocket() {
   const adminForceAdvance = useCallback(() => send({ type: "admin-force-advance" }), [send]);
   const adminTiebreaker = useCallback((teamIds: number[]) => send({ type: "admin-tiebreaker", teamIds }), [send]);
   const adminNextTeam = useCallback(() => send({ type: "admin-next-team" }), [send]);
+  const adminSetTeamOrder = useCallback((teamIds: number[]) => send({ type: "admin-set-team-order", teamIds }), [send]);
 
   return {
     gameState,
@@ -243,5 +246,6 @@ export function useGameSocket() {
     adminForceAdvance,
     adminTiebreaker,
     adminNextTeam,
+    adminSetTeamOrder,
   };
 }

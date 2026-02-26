@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
@@ -130,6 +130,8 @@ export default function Admin() {
   const [catFormColor, setCatFormColor] = useState("#6B7280");
   const [showCatManager, setShowCatManager] = useState(false);
   const [tiebreakerTeams, setTiebreakerTeams] = useState<number[]>([]);
+  const [orderedTeamIds, setOrderedTeamIds] = useState<number[]>([]);
+  const [orderSavedFlash, setOrderSavedFlash] = useState(false);
 
   const adminFetch = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -462,6 +464,28 @@ export default function Admin() {
   const currentTeam = teams.find((t: Team) => t.id === wsGameState.currentTeamId);
   const currentPlayerName = wsGameState.currentPlayerName;
   const gamePhase = wsGameState.phase;
+
+  useEffect(() => {
+    if (teams.length === 0) return;
+    if (wsGameState.customTeamOrder && wsGameState.customTeamOrder.length > 0) {
+      setOrderedTeamIds(wsGameState.customTeamOrder);
+    } else if (orderedTeamIds.length === 0) {
+      setOrderedTeamIds([...teams].sort((a, b) => a.id - b.id).map((t) => t.id));
+    }
+  }, [teams, wsGameState.customTeamOrder]);
+
+  const moveTeamInOrder = useCallback((index: number, direction: -1 | 1) => {
+    setOrderedTeamIds((prev) => {
+      const next = [...prev];
+      const swap = index + direction;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[index], next[swap]] = [next[swap], next[index]];
+      adminSetTeamOrder(next);
+      setOrderSavedFlash(true);
+      setTimeout(() => setOrderSavedFlash(false), 1500);
+      return next;
+    });
+  }, [adminSetTeamOrder]);
 
   const isLoading = teamsLoading;
 
@@ -796,6 +820,70 @@ export default function Admin() {
                 <span className={isRTL ? "font-arabic" : ""}>{t("resetGame")}</span>
               </Button>
             )}
+          </div>
+        </Card>
+
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}>
+              <List className="h-4 w-4 text-amber-500" />
+              {t("teamPlayOrder")}
+            </h3>
+            {orderSavedFlash && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className={`text-xs text-emerald-500 flex items-center gap-1 ${isRTL ? "font-arabic" : ""}`}
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                {t("orderSaved")}
+              </motion.span>
+            )}
+          </div>
+          <p className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("teamPlayOrderNote")}</p>
+          <div className="space-y-1.5">
+            {orderedTeamIds.map((teamId, index) => {
+              const team = teams.find((t: Team) => t.id === teamId);
+              if (!team) return null;
+              return (
+                <div
+                  key={teamId}
+                  className="flex items-center gap-2 p-2 rounded-md bg-muted/30 border border-border/40"
+                  data-testid={`team-order-row-${teamId}`}
+                >
+                  <span className="text-xs text-muted-foreground w-4 text-center font-bold">{index + 1}</span>
+                  <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                  <span className={`flex-1 text-sm font-medium truncate ${isRTL ? "font-arabic" : ""}`}>
+                    {language === "ar" ? team.nameAr : team.nameEn}
+                  </span>
+                  <div className="flex gap-0.5 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      disabled={index === 0}
+                      onClick={() => moveTeamInOrder(index, -1)}
+                      data-testid={`button-move-up-${teamId}`}
+                      title={t("moveUp")}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      disabled={index === orderedTeamIds.length - 1}
+                      onClick={() => moveTeamInOrder(index, 1)}
+                      data-testid={`button-move-down-${teamId}`}
+                      title={t("moveDown")}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
 

@@ -23,6 +23,7 @@ interface InMemoryGameState {
   pausedPhase: GamePhase | null;
   pausedTimerSeconds: number;
   gameError: string | null;
+  customTeamOrder: number[];
 }
 
 const defaultGameState: InMemoryGameState = {
@@ -43,6 +44,7 @@ const defaultGameState: InMemoryGameState = {
   pausedPhase: null,
   pausedTimerSeconds: 0,
   gameError: null,
+  customTeamOrder: [],
 };
 
 let gameState: InMemoryGameState = { ...defaultGameState };
@@ -161,6 +163,7 @@ async function broadcastFullState() {
         currentTeamIndex: gameState.currentTeamIndex,
         teamOrder: gameState.teamOrder,
         gameError: gameState.gameError,
+        customTeamOrder: gameState.customTeamOrder,
       },
     });
   } catch (error) {
@@ -195,25 +198,18 @@ async function endEntryPhase() {
 
   const allTeams = await storage.getTeams();
 
-  const teamPlayOrder = [
-    "Ahl Al-Raya",
-    "Marsa Al-Fikr",
-    "Al-Fallah",
-    "Falaj Gharba",
-    "Al-Nukhba",
-    "Al-Bidaya",
-  ];
-
-  const getPlayPriority = (teamId: number) => {
-    const team = allTeams.find((t) => t.id === teamId);
-    if (!team) return 99;
-    const idx = teamPlayOrder.findIndex((name) => team.nameEn.includes(name));
-    return idx === -1 ? 99 : idx;
-  };
-
-  gameState.teamOrder = [...gameState.entryTeams].sort(
-    (a, b) => getPlayPriority(a) - getPlayPriority(b)
-  );
+  if (gameState.customTeamOrder.length > 0) {
+    const joined = new Set(gameState.entryTeams);
+    const orderedJoined = gameState.customTeamOrder.filter((id) => joined.has(id));
+    const remaining = gameState.entryTeams.filter((id) => !gameState.customTeamOrder.includes(id));
+    gameState.teamOrder = [...orderedJoined, ...remaining];
+  } else {
+    gameState.teamOrder = [...gameState.entryTeams].sort((a, b) => {
+      const idxA = allTeams.findIndex((t) => t.id === a);
+      const idxB = allTeams.findIndex((t) => t.id === b);
+      return idxA - idxB;
+    });
+  }
 
   const teams = allTeams;
   gameState.teamPlayers = {};
@@ -637,6 +633,15 @@ async function handleMessage(ws: WebSocket, raw: string) {
         }
 
         await handleAnswerSubmission(answer);
+        break;
+      }
+
+      case "admin-set-team-order": {
+        const { teamIds } = msg as { teamIds: number[] };
+        if (Array.isArray(teamIds)) {
+          gameState.customTeamOrder = teamIds;
+          await broadcastFullState();
+        }
         break;
       }
 
