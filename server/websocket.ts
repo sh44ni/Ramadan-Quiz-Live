@@ -24,6 +24,9 @@ interface InMemoryGameState {
   pausedTimerSeconds: number;
   gameError: string | null;
   customTeamOrder: number[];
+  // Team-by-team flow
+  allTeamOrder: number[];   // full ordered sequence of all team IDs
+  matchTeamIndex: number;   // which team in allTeamOrder is currently playing
 }
 
 const defaultGameState: InMemoryGameState = {
@@ -45,6 +48,8 @@ const defaultGameState: InMemoryGameState = {
   pausedTimerSeconds: 0,
   gameError: null,
   customTeamOrder: [],
+  allTeamOrder: [],
+  matchTeamIndex: 0,
 };
 
 let gameState: InMemoryGameState = { ...defaultGameState };
@@ -164,6 +169,8 @@ async function broadcastFullState() {
         teamOrder: gameState.teamOrder,
         gameError: gameState.gameError,
         customTeamOrder: gameState.customTeamOrder,
+        allTeamOrder: gameState.allTeamOrder,
+        matchTeamIndex: gameState.matchTeamIndex,
       },
     });
   } catch (error) {
@@ -176,16 +183,18 @@ async function startEntryPhase() {
   gameState.entryTeams = [];
   gameState.gameError = null;
 
-  startTimer(120, async () => {
+  const expectedTeamId = gameState.allTeamOrder[gameState.matchTeamIndex] ?? null;
+
+  startTimer(60, async () => {
     await endEntryPhase();
   });
 
-  broadcast({ type: "phase-changed", phase: "entry" });
+  broadcast({ type: "phase-changed", phase: "entry", expectedTeamId });
   await broadcastFullState();
 }
 
 async function endEntryPhase() {
-  if (gameState.entryTeams.length < 2) {
+  if (gameState.entryTeams.length < 1) {
     stopTimer();
     gameState.gameError = "not-enough-teams";
     gameState.phase = "finished";
@@ -196,34 +205,18 @@ async function endEntryPhase() {
     return;
   }
 
-  const allTeams = await storage.getTeams();
-
-  if (gameState.customTeamOrder.length > 0) {
-    const joined = new Set(gameState.entryTeams);
-    const orderedJoined = gameState.customTeamOrder.filter((id) => joined.has(id));
-    const remaining = gameState.entryTeams.filter((id) => !gameState.customTeamOrder.includes(id));
-    gameState.teamOrder = [...orderedJoined, ...remaining];
-  } else {
-    gameState.teamOrder = [...gameState.entryTeams].sort((a, b) => {
-      const idxA = allTeams.findIndex((t) => t.id === a);
-      const idxB = allTeams.findIndex((t) => t.id === b);
-      return idxA - idxB;
-    });
-  }
-
-  const teams = allTeams;
-  gameState.teamPlayers = {};
-  gameState.teamQuestionsAnswered = {};
-  for (const team of teams) {
-    if (gameState.teamOrder.includes(team.id)) {
-      gameState.teamPlayers[team.id] = [team.captain, ...team.members.filter((m) => m !== team.captain)];
-      gameState.teamQuestionsAnswered[team.id] = 0;
-    }
-  }
-
-  await buildQuestionNumberMap();
-
+  // One team at a time: take the first (and only expected) team that joined
+  const teamId = gameState.entryTeams[0];
+  gameState.teamOrder = [teamId];
   gameState.currentTeamIndex = 0;
+
+  const allTeams = await storage.getTeams();
+  const team = allTeams.find((t) => t.id === teamId);
+  if (team) {
+    gameState.teamPlayers[teamId] = [team.captain, ...team.members.filter((m) => m !== team.captain)];
+  }
+  // Reset question counter for this team only (others carry over)
+  gameState.teamQuestionsAnswered[teamId] = 0;
 
   broadcast({ type: "entry-closed" });
   await startSelectionPhase();
@@ -448,47 +441,24 @@ async function advanceToNextTurn() {
 }
 
 async function advanceToNextTeam() {
-  const nextTeamIndex = gameState.currentTeamIndex + 1;
   const completedTeamId = gameState.teamOrder[gameState.currentTeamIndex];
+  const available = getAvailableNumbers();
+  const hasNextTeam = gameState.matchTeamIndex + 1 < gameState.allTeamOrder.length;
+  const nextTeamId = hasNextTeam ? gameState.allTeamOrder[gameState.matchTeamIndex + 1] : null;
 
-  if (nextTeamIndex >= gameState.teamOrder.length) {
-    const available = getAvailableNumbers();
-    if (available.length > 0 && hasAnyTeamWithRemainingQuestions()) {
-      gameState.currentTeamIndex = 0;
-    } else {
-      await endGame();
-      return;
-    }
-  } else {
-    gameState.currentTeamIndex = nextTeamIndex;
-  }
-
-  const nextTeamId = getCurrentTeamId()!;
-
-  broadcast({ type: "team-completed", completedTeamId, nextTeamId });
-  broadcast({ type: "turn-changed", teamId: nextTeamId });
-
-  // Halftime auto-pause: after the first half of teams complete, pause so admin
-  // controls when the second half starts. Only applies when there are 4+ teams.
-  const half = Math.ceil(gameState.teamOrder.length / 2);
-  if (gameState.teamOrder.length >= 4 && gameState.currentTeamIndex === half) {
-    gameState.pausedPhase = "team-complete";
-    gameState.pausedTimerSeconds = 0;
-    gameState.phase = "paused";
-
-    if (gameState.sessionId) {
-      await storage.updateSession(gameState.sessionId, { status: "paused" });
-    }
-
-    broadcast({ type: "game-paused" });
-    broadcast({ type: "phase-changed", phase: "paused" });
+  if (available.length > 0 && hasNextTeam) {
+    // More teams to play — pause at team-complete, admin clicks Next Team to open entry
+    broadcast({ type: "team-completed", completedTeamId, nextTeamId });
+    gameState.phase = "team-complete";
+    broadcast({ type: "phase-changed", phase: "team-complete" });
     await broadcastFullState();
-    return;
+  } else {
+    // No more teams or no questions — end game
+    if (completedTeamId) {
+      broadcast({ type: "team-completed", completedTeamId, nextTeamId: null });
+    }
+    await endGame();
   }
-
-  gameState.phase = "team-complete";
-  broadcast({ type: "phase-changed", phase: "team-complete" });
-  await broadcastFullState();
 }
 
 function hasAnyTeamWithRemainingQuestions(): boolean {
@@ -552,6 +522,8 @@ async function handleMessage(ws: WebSocket, raw: string) {
             currentTeamIndex: gameState.currentTeamIndex,
             teamOrder: gameState.teamOrder,
             gameError: gameState.gameError,
+            allTeamOrder: gameState.allTeamOrder,
+            matchTeamIndex: gameState.matchTeamIndex,
           },
         }));
         ws.send(JSON.stringify({ type: "timer-update", seconds: gameState.timerSeconds, running: gameState.timerRunning, phase: gameState.phase }));
@@ -579,11 +551,31 @@ async function handleMessage(ws: WebSocket, raw: string) {
           });
         }
 
+        // Build the full team sequence (respects custom drag-and-drop order)
+        const prevCustomOrder = gameState.customTeamOrder;
+        let allTeamOrder: number[];
+        if (prevCustomOrder.length > 0) {
+          const teamIdSet = new Set(teams.map((t) => t.id));
+          const ordered = prevCustomOrder.filter((id) => teamIdSet.has(id));
+          const remaining = teams.map((t) => t.id).filter((id) => !prevCustomOrder.includes(id));
+          allTeamOrder = [...ordered, ...remaining];
+        } else {
+          allTeamOrder = [...teams].sort((a, b) => a.id - b.id).map((t) => t.id);
+        }
+
+        const activeQuestions = (await storage.getQuestions()).filter((q) => q.isActive !== false);
+
         gameState = {
           ...defaultGameState,
           sessionId: session.id,
-          totalQuestions: Math.min(31, (await storage.getQuestions()).filter(q => q.isActive !== false).length),
+          totalQuestions: Math.min(31, activeQuestions.length),
+          customTeamOrder: prevCustomOrder,
+          allTeamOrder,
+          matchTeamIndex: 0,
         };
+
+        // Build question map once for the whole game
+        await buildQuestionNumberMap();
 
         broadcast({ type: "game-started" });
         await startEntryPhase();
@@ -600,16 +592,18 @@ async function handleMessage(ws: WebSocket, raw: string) {
 
       case "team-join": {
         if (gameState.phase === "entry" && msg.teamId) {
+          const expectedTeamId = gameState.allTeamOrder[gameState.matchTeamIndex];
+          // Only accept the expected team for this slot
+          if (msg.teamId !== expectedTeamId) {
+            ws.send(JSON.stringify({ type: "error", message: "Not your turn to enter" }));
+            break;
+          }
           if (!gameState.entryTeams.includes(msg.teamId)) {
             gameState.entryTeams.push(msg.teamId);
             broadcast({ type: "team-joined", teamId: msg.teamId });
-            await broadcastFullState();
-
-            const allTeams = await storage.getTeams();
-            if (gameState.entryTeams.length >= allTeams.length) {
-              stopTimer();
-              await endEntryPhase();
-            }
+            // Close entry immediately — only one team needed
+            stopTimer();
+            await endEntryPhase();
           }
         }
         break;
@@ -665,7 +659,15 @@ async function handleMessage(ws: WebSocket, raw: string) {
 
       case "admin-next-team": {
         if (gameState.phase === "team-complete") {
-          await startSelectionPhase();
+          // Advance to next team's entry phase
+          gameState.matchTeamIndex++;
+          gameState.currentTeamIndex = 0;
+          gameState.selectedQuestionId = null;
+          gameState.teamOrder = [];
+          if (gameState.sessionId) {
+            await storage.updateSession(gameState.sessionId, { currentQuestionId: null });
+          }
+          await startEntryPhase();
         }
         break;
       }
@@ -710,7 +712,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
               case "selection": return () => handleSelectionTimeout();
               case "preparation": return () => startAnswerPhase();
               case "answer": return () => handleAnswerTimeout();
-              default: return () => {};
+              default: return () => { };
             }
           };
 

@@ -521,6 +521,12 @@ export default function Admin() {
   const currentTeam = teams.find((t: Team) => t.id === wsGameState.currentTeamId);
   const currentPlayerName = wsGameState.currentPlayerName;
   const gamePhase = wsGameState.phase;
+  const allTeamOrder: number[] = wsGameState.allTeamOrder || [];
+  const matchTeamIndex: number = wsGameState.matchTeamIndex || 0;
+  const nextTeamInOrder = allTeamOrder[matchTeamIndex + 1] ?? null;
+  const nextTeamObj = nextTeamInOrder ? teams.find((t: Team) => t.id === nextTeamInOrder) : null;
+  const expectedEntryTeamId = allTeamOrder[matchTeamIndex] ?? null;
+  const expectedEntryTeam = expectedEntryTeamId ? teams.find((t: Team) => t.id === expectedEntryTeamId) : null;
 
   const isLoading = teamsLoading;
 
@@ -688,6 +694,18 @@ export default function Admin() {
                         "bg-orange-500/15 text-orange-600"
                   }`}>{phaseLabel}</Badge>
               </div>
+              {gamePhase === "entry" && expectedEntryTeam && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: expectedEntryTeam.color }} />
+                  <span className={`text-xs font-semibold ${isRTL ? "font-arabic" : ""}`}>
+                    {t("waitingFor") || "Waiting for"}:{" "}
+                    {language === "ar" ? expectedEntryTeam.nameAr : expectedEntryTeam.nameEn}
+                  </span>
+                  <Badge variant="outline" className="text-xs ml-auto">
+                    {matchTeamIndex + 1}/{allTeamOrder.length || teams.length}
+                  </Badge>
+                </div>
+              )}
               {currentTeam && (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-full" style={{ backgroundColor: currentTeam.color }} />
@@ -794,7 +812,11 @@ export default function Admin() {
                 data-testid="button-next-team"
               >
                 <Play className="h-4 w-4" />
-                <span className={isRTL ? "font-arabic" : ""}>{t("nextTeamBtn")}</span>
+                <span className={isRTL ? "font-arabic" : ""}>
+                  {nextTeamObj
+                    ? `${t("nextTeamBtn")} → ${language === "ar" ? nextTeamObj.nameAr : nextTeamObj.nameEn}`
+                    : t("nextTeamBtn")}
+                </span>
               </Button>
             )}
 

@@ -25,6 +25,8 @@ export interface GameState {
   teamOrder: number[];
   gameError: string | null;
   customTeamOrder: number[];
+  allTeamOrder: number[];
+  matchTeamIndex: number;
 }
 
 interface TimerState {
@@ -68,6 +70,8 @@ const defaultState: GameState = {
   teamOrder: [],
   gameError: null,
   customTeamOrder: [],
+  allTeamOrder: [],
+  matchTeamIndex: 0,
 };
 
 export function useGameSocket() {

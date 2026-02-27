@@ -45,7 +45,7 @@ export default function Game() {
   const [isJoining, setIsJoining] = useState(false);
 
   const { gameState, timer, answerResult, connected, submitAnswer, selectQuestion, joinTeam } = useGameSocket();
-  const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, teamPlayers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered } = gameState;
+  const { session, scores, teams, currentQuestion, phase, currentTeamId, currentPlayerName, usedQuestionNumbers, teamPlayers, entryTeams, totalQuestions, questionsPerTeam, teamQuestionsAnswered, allTeamOrder, matchTeamIndex } = gameState;
   const currentTeam = teams.find((t) => t.id === currentTeamId);
   const allNumbers = Array.from({ length: totalQuestions }, (_, i) => i + 1);
 
@@ -74,10 +74,12 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
-    if (phase === "entry" && playerTeamId && !entryTeams.includes(playerTeamId)) {
+    const expectedTeamId = allTeamOrder[matchTeamIndex];
+    // Only auto-join during entry if this player is the expected team
+    if (phase === "entry" && playerTeamId && playerTeamId === expectedTeamId && !entryTeams.includes(playerTeamId)) {
       joinTeam(playerTeamId);
     }
-  }, [phase, playerTeamId, entryTeams, joinTeam]);
+  }, [phase, playerTeamId, entryTeams, joinTeam, allTeamOrder, matchTeamIndex]);
 
   useEffect(() => {
     if (currentQuestion && currentQuestion.id !== lastQuestionId) {
@@ -244,7 +246,11 @@ export default function Game() {
   }
 
   if (phase === "entry") {
+    const expectedTeamId = allTeamOrder[matchTeamIndex];
+    const expectedTeam = teams.find((t) => t.id === expectedTeamId);
+    const expectedTeamName = expectedTeam ? (language === "ar" ? expectedTeam.nameAr : expectedTeam.nameEn) : "";
     const myTeamJoined = playerTeamId ? entryTeams.includes(playerTeamId) : false;
+    const isMyTeamExpected = playerTeamId === expectedTeamId;
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-52px)] ramadan-gradient relative overflow-hidden">
         <div className="mosque-silhouette opacity-15" />
@@ -274,27 +280,30 @@ export default function Game() {
             </div>
           </div>
 
+          {expectedTeamName && (
+            <div className="space-y-1">
+              <p className={`text-sm text-white/60 ${isRTL ? "font-arabic" : ""}`}>{t("entryPhase")}</p>
+              <h2 className={`text-2xl font-bold text-amber-300 ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-phase">
+                {expectedTeamName}
+              </h2>
+              <p className={`text-white/70 text-sm ${isRTL ? "font-arabic" : ""}`}>
+                {t("entryPhaseDesc")}
+              </p>
+            </div>
+          )}
+
           {playerName && (
-            <h2 className={`text-xl font-bold text-amber-300 ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-welcome">
+            <h2 className={`text-lg font-bold text-white/80 ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-welcome">
               {t("welcomePlayer", { name: playerName })}
             </h2>
           )}
-          {playerTeam && (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: playerTeam.color }} />
-              <span className={`text-base text-white/80 ${isRTL ? "font-arabic" : ""}`}>
-                {language === "ar" ? playerTeam.nameAr : playerTeam.nameEn}
-              </span>
-            </div>
-          )}
-          <h2 className={`text-2xl font-bold text-white ${isRTL ? "font-arabic" : ""}`} data-testid="text-entry-phase">
-            {t("entryPhase")}
-          </h2>
-          <p className={`text-blue-100/70 ${isRTL ? "font-arabic" : ""}`}>
-            {t("entryPhaseDesc")}
-          </p>
 
-          {myTeamJoined ? (
+          {!isMyTeamExpected ? (
+            <Badge className="bg-white/10 text-white/70 border-white/20 gap-2 text-base px-4 py-2">
+              <Clock className="h-5 w-5" />
+              <span className={isRTL ? "font-arabic" : ""}>{t("waitingForTurn")}</span>
+            </Badge>
+          ) : myTeamJoined ? (
             <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 gap-2 text-base px-4 py-2">
               <CheckCircle2 className="h-5 w-5" />
               <span className={isRTL ? "font-arabic" : ""}>{t("teamJoined")}</span>
@@ -319,8 +328,8 @@ export default function Game() {
           )}
 
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <span className="text-xs text-white/50">{t("teamsJoined")}:</span>
-            <span className="text-sm font-bold text-amber-400">{entryTeams.length}/6</span>
+            <span className="text-xs text-white/50">{t("round") || "Round"}:</span>
+            <span className="text-sm font-bold text-amber-400">{matchTeamIndex + 1}/{allTeamOrder.length || teams.length}</span>
           </div>
         </motion.div>
       </div>
@@ -632,6 +641,25 @@ export default function Game() {
                   <h3 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>
                     {t("paused")}
                   </h3>
+                </Card>
+              </motion.div>
+            )}
+
+            {phase === "team-complete" && (
+              <motion.div
+                key="team-complete"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card className="p-8 text-center space-y-3">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-500" />
+                  <h3 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>
+                    {t("teamCompletePhase")}
+                  </h3>
+                  <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                    {t("waitingForAdmin") || "Waiting for admin to start next team..."}
+                  </p>
                 </Card>
               </motion.div>
             )}
