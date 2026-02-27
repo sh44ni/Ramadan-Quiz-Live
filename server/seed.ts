@@ -13,34 +13,40 @@ const categoriesData = [
 
 const teamsData = [
   {
-    nameEn: "Team 1: Al-Bidaya (The Beginning)", nameAr: "الفريق (1): البداية", color: "#3B82F6",
-    captain: "مهاجر محمد",
-    members: ["حامد محمد", "حازم محمد", "محمد سعيد (أبو مهاجر)"],
-  },
-  {
-    nameEn: "Team 2: Al-Fallah (The Farmer)", nameAr: "الفريق (2): الفلاح", color: "#10B981",
-    captain: "عمر سعيد",
-    members: ["غيث سعيد", "فلاح السعيدي"],
-  },
-  {
-    nameEn: "Team 3: Ahl Al-Raya (Flag People)", nameAr: "الفريق (3): أهل الراية", color: "#F59E0B",
+    // Position 1 — plays first
+    nameEn: "Team 1: Ahl Al-Raya", nameAr: "الفريق الأول: أهل الراية", color: "#F59E0B",
     captain: "حافظ سعيد",
     members: ["عصام سعيد", "محمود سعيد", "عبد الله سعيد"],
   },
   {
-    nameEn: "Team 4: Al-Nukhba (The Elite)", nameAr: "الفريق (4): النخبة", color: "#EF4444",
-    captain: "أحمد علي حمدان",
-    members: ["معتز سعيد", "الوارث مبارك", "مصباح"],
+    // Position 2
+    nameEn: "Team 2: Marsa Al-Fikr", nameAr: "الفريق الثاني: مرسى الفكر", color: "#F97316",
+    captain: "حميد خالد",
+    members: ["عمر ساعد", "إبراهيم المكتومي", "عبد الله الكيومي"],
   },
   {
-    nameEn: "Team 5: Falaj Gharba", nameAr: "الفريق (5): فلج غربة", color: "#8B5CF6",
+    // Position 3
+    nameEn: "Team 3: Al-Fallah", nameAr: "الفريق الثالث: الفلاح", color: "#10B981",
+    captain: "عمر سعيد",
+    members: ["غيث سعيد", "فلاح السعيدي"],
+  },
+  {
+    // Position 4
+    nameEn: "Team 4: Falaj Gharba", nameAr: "الفريق الرابع: فلج غربة", color: "#8B5CF6",
     captain: "فهد محمد",
     members: ["فايز سيف", "نبيل سيف", "هشام سيف"],
   },
   {
-    nameEn: "Team 6: Marsa Al-Fikr (Harbor of Thought)", nameAr: "الفريق (6): مرسى الفكر", color: "#F97316",
-    captain: "حميد خالد",
-    members: ["عمر ساعد", "إبراهيم المكتومي", "عبد الله الكيومي"],
+    // Position 5
+    nameEn: "Team 5: Al-Nukhba", nameAr: "الفريق الخامس: النخبة", color: "#EF4444",
+    captain: "أحمد علي حمدان",
+    members: ["معتز سعيد", "الوارث مبارك", "مصباح"],
+  },
+  {
+    // Position 6 — plays last
+    nameEn: "Team 6: Al-Bidaya", nameAr: "الفريق السادس: البداية", color: "#3B82F6",
+    captain: "مهاجر محمد",
+    members: ["حامد محمد", "حازم محمد", "محمد سعيد (أبو مهاجر)"],
   },
 ];
 
