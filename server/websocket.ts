@@ -185,7 +185,7 @@ async function startEntryPhase() {
 
   const expectedTeamId = gameState.allTeamOrder[gameState.matchTeamIndex] ?? null;
 
-  startTimer(60, async () => {
+  startTimer(600, async () => {
     await endEntryPhase();
   });
 
@@ -196,12 +196,9 @@ async function startEntryPhase() {
 async function endEntryPhase() {
   if (gameState.entryTeams.length < 1) {
     stopTimer();
-    gameState.gameError = "not-enough-teams";
-    gameState.phase = "finished";
-    if (gameState.sessionId) {
-      await storage.updateSession(gameState.sessionId, { status: "finished" });
-    }
-    await broadcastFullState();
+    // Instead of crashing the whole game, just pretend this team finished 0 questions
+    // This moves us securely to the "team-complete" pause screen so admin can "Next Team"
+    await advanceToNextTeam();
     return;
   }
 
