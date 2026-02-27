@@ -215,7 +215,7 @@ export function useGameSocket() {
     send({ type: "team-join", teamId });
   }, [send]);
 
-  const adminStart = useCallback(() => send({ type: "admin-start" }), [send]);
+  const adminStart = useCallback((teamOrder?: number[]) => send({ type: "admin-start", teamOrder }), [send]);
   const adminPause = useCallback(() => send({ type: "admin-pause" }), [send]);
   const adminResume = useCallback(() => send({ type: "admin-resume" }), [send]);
   const adminEnd = useCallback(() => send({ type: "admin-end" }), [send]);

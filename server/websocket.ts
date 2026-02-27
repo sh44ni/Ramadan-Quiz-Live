@@ -551,8 +551,10 @@ async function handleMessage(ws: WebSocket, raw: string) {
           });
         }
 
-        // Build the full team sequence (respects custom drag-and-drop order)
-        const prevCustomOrder = gameState.customTeamOrder;
+        // Build the full team sequence — prefer the order sent from the UI panel
+        const prevCustomOrder = (msg.teamOrder as number[] | undefined)?.length
+          ? (msg.teamOrder as number[])
+          : gameState.customTeamOrder;
         let allTeamOrder: number[];
         if (prevCustomOrder.length > 0) {
           const teamIdSet = new Set(teams.map((t) => t.id));

@@ -418,12 +418,17 @@ export default function Admin() {
 
   useEffect(() => {
     if (teams.length === 0) return;
-    if (wsGameState.customTeamOrder && wsGameState.customTeamOrder.length > 0) {
-      setOrderedTeamIds(wsGameState.customTeamOrder);
-    } else if (orderedTeamIds.length === 0) {
-      setOrderedTeamIds([...teams].sort((a: Team, b: Team) => a.id - b.id).map((t: Team) => t.id));
+    // Only sync from server on first load (when local list is empty).
+    // After that, local state is authoritative so arrow clicks aren't overwritten
+    // by the next server broadcast.
+    if (orderedTeamIds.length === 0) {
+      if (wsGameState.customTeamOrder && wsGameState.customTeamOrder.length > 0) {
+        setOrderedTeamIds(wsGameState.customTeamOrder);
+      } else {
+        setOrderedTeamIds([...teams].sort((a: Team, b: Team) => a.id - b.id).map((t: Team) => t.id));
+      }
     }
-  }, [teams, wsGameState.customTeamOrder]);
+  }, [teams]); // intentionally exclude customTeamOrder — only run on initial team load
 
   const moveTeamInOrder = useCallback((index: number, direction: -1 | 1) => {
     setOrderedTeamIds((prev) => {
@@ -778,7 +783,7 @@ export default function Admin() {
           <div className="grid grid-cols-2 gap-2">
             {(gamePhase === "idle" || gamePhase === "finished") && (
               <Button
-                onClick={() => handleWsAction("start", adminStart)}
+                onClick={() => handleWsAction("start", () => adminStart(orderedTeamIds))}
                 disabled={actionLoading !== null}
                 isLoading={actionLoading === "start"}
                 className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold"
