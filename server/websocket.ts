@@ -468,6 +468,24 @@ async function advanceToNextTeam() {
   broadcast({ type: "team-completed", completedTeamId, nextTeamId });
   broadcast({ type: "turn-changed", teamId: nextTeamId });
 
+  // Halftime auto-pause: after the first half of teams complete, pause so admin
+  // controls when the second half starts. Only applies when there are 4+ teams.
+  const half = Math.ceil(gameState.teamOrder.length / 2);
+  if (gameState.teamOrder.length >= 4 && gameState.currentTeamIndex === half) {
+    gameState.pausedPhase = "team-complete";
+    gameState.pausedTimerSeconds = 0;
+    gameState.phase = "paused";
+
+    if (gameState.sessionId) {
+      await storage.updateSession(gameState.sessionId, { status: "paused" });
+    }
+
+    broadcast({ type: "game-paused" });
+    broadcast({ type: "phase-changed", phase: "paused" });
+    await broadcastFullState();
+    return;
+  }
+
   gameState.phase = "team-complete";
   broadcast({ type: "phase-changed", phase: "team-complete" });
   await broadcastFullState();
