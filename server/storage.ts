@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, inArray } from "drizzle-orm";
 import {
   teams, questions, gameSessions, teamScores, questionHistory, categories,
   type Team, type InsertTeam,
@@ -116,32 +116,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveSession(): Promise<GameSession | undefined> {
-    const sessions = await db
+    // Single query instead of 4 — prevents pool exhaustion under concurrent load
+    const allSessions = await db
       .select()
       .from(gameSessions)
-      .where(
-        eq(gameSessions.status, "active")
-      );
-    if (sessions.length > 0) return sessions[0];
+      .where(inArray(gameSessions.status, ["active", "paused", "waiting", "finished"]));
 
-    const paused = await db
-      .select()
-      .from(gameSessions)
-      .where(eq(gameSessions.status, "paused"));
-    if (paused.length > 0) return paused[0];
-
-    const waiting = await db
-      .select()
-      .from(gameSessions)
-      .where(eq(gameSessions.status, "waiting"));
-    if (waiting.length > 0) return waiting[0];
-
-    const finished = await db
-      .select()
-      .from(gameSessions)
-      .where(eq(gameSessions.status, "finished"));
-    if (finished.length > 0) return finished[finished.length - 1];
-
+    const priority = ["active", "paused", "waiting", "finished"];
+    for (const status of priority) {
+      const match = allSessions.filter((s) => s.status === status);
+      if (match.length > 0) {
+        return status === "finished" ? match[match.length - 1] : match[0];
+      }
+    }
     return undefined;
   }
 

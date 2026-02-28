@@ -14,12 +14,12 @@ console.log("DATABASE_URL (sanitized):", cleanUrl.replace(/:[^:@]*@/, ":***@"));
 
 const pool = new Pool({
   connectionString: cleanUrl,
-  // Neon free tier allows up to 5 direct connections; keep it at 3 to be safe
-  max: 3,
-  idleTimeoutMillis: 30000,
+  // Neon free tier allows up to 5 direct connections
+  max: 5,
+  idleTimeoutMillis: 5000,   // aggressively recycle stale connections from seeding
   connectionTimeoutMillis: 10000,
   keepAlive: true,
-  keepAliveInitialDelayMillis: 10000,
+  keepAliveInitialDelayMillis: 0,  // start keepalive probes immediately
 });
 
 pool.on("error", (err) => {
