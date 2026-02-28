@@ -2,21 +2,22 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
-// Remove channel_binding=require — it is incompatible with Neon's PgBouncer pooler
-// and causes "Connection terminated due to connection timeout" errors.
+// Using Neon's PgBouncer pooler URL (-pooler hostname) with pg.Pool causes
+// "double-pooling" and connection exhaustion. Strip -pooler so we connect
+// directly to Neon and let pg.Pool manage connections itself.
+// Also strip channel_binding=require which PgBouncer does not support.
 const rawUrl = process.env.DATABASE_URL || "";
-const cleanUrl = rawUrl.replace(/[&?]channel_binding=[^&]*/g, "");
+const cleanUrl = rawUrl
+  .replace(/-pooler(\.[^/]*)/, "$1")           // remove -pooler from hostname
+  .replace(/[&?]channel_binding=[^&]*/g, "");  // remove channel_binding param
 console.log("DATABASE_URL (sanitized):", cleanUrl.replace(/:[^:@]*@/, ":***@"));
 
 const pool = new Pool({
   connectionString: cleanUrl,
-  // Stay within Neon free-tier connection limits
+  // Neon free tier allows up to 5 direct connections; keep it at 3 to be safe
   max: 3,
-  // Give idle connections 30s before closing
   idleTimeoutMillis: 30000,
-  // Allow up to 10s to acquire a connection before failing
   connectionTimeoutMillis: 10000,
-  // Send keepalive packets so the OS/proxy doesn't silently drop idle connections
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 });
