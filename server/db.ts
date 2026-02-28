@@ -1,29 +1,26 @@
 import { Pool, type PoolConfig } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import dns from "dns";
 import * as schema from "@shared/schema";
 
-// Strip -pooler (PgBouncer double-pool issue) and channel_binding (unsupported by pooler)
+// Only strip channel_binding — it is not supported by PgBouncer.
+// Keep the -pooler hostname: Neon's pooler is designed for many app connections.
+// The direct endpoint (without -pooler) has very limited concurrent connections
+// on the free tier, causing pool exhaustion after seeding.
 const rawUrl = process.env.DATABASE_URL || "";
-const cleanUrl = rawUrl
-  .replace(/-pooler(\.[^/]*)/, "$1")
-  .replace(/[&?]channel_binding=[^&]*/g, "");
+const cleanUrl = rawUrl.replace(/[&?]channel_binding=[^&]*/g, "");
 console.log("DATABASE_URL (sanitized):", cleanUrl.replace(/:[^:@]*@/, ":***@"));
 
-// The VPS resolves Neon's hostname to IPv6, which causes pg's SSL/auth handshake
-// to fail ("Connection terminated unexpectedly"). Force IPv4 via dns.lookup family=4.
-// Cast needed because @types/pg doesn't expose the underlying net.connect options.
-const poolConfig: PoolConfig & { family?: number } = {
+// The VPS resolves Neon's hostname to IPv6 which causes SSL/auth termination.
+// forcing family=4 makes pg use IPv4 (same as local Windows). We cast because
+// @types/pg doesn't expose this underlying net.connect option.
+const poolConfig: PoolConfig = {
   connectionString: cleanUrl,
-  max: 5,
-  idleTimeoutMillis: 5000,
+  max: 3,
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 10000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 0,
 };
-
-// pg passes extra options to net.connect, which accepts `family`.
-// We use a cast to avoid TS errors since the type definition omits it.
 (poolConfig as any).family = 4;
 
 const pool = new Pool(poolConfig);
