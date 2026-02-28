@@ -1,8 +1,7 @@
 import { db } from "./db";
 import { eq, and, lt } from "drizzle-orm";
 import {
-  teams, questions, gameSessions, teamScores, questionHistory,
-  authorizedEmails, otpCodes, categories,
+  teams, questions, gameSessions, teamScores, questionHistory, categories,
   type Team, type InsertTeam,
   type Category, type InsertCategory,
   type Question, type InsertQuestion,
@@ -16,6 +15,7 @@ export interface IStorage {
   getTeam(id: number): Promise<Team | undefined>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: number, data: Partial<Team>): Promise<Team | undefined>;
+  deleteTeam(id: number): Promise<void>;
 
   getCategories(): Promise<Category[]>;
   getCategory(id: number): Promise<Category | undefined>;
@@ -63,6 +63,10 @@ export class DatabaseStorage implements IStorage {
   async updateTeam(id: number, data: Partial<Team>): Promise<Team | undefined> {
     const [updated] = await db.update(teams).set(data).where(eq(teams.id, id)).returning();
     return updated;
+  }
+
+  async deleteTeam(id: number): Promise<void> {
+    await db.delete(teams).where(eq(teams.id, id));
   }
 
   async getCategories(): Promise<Category[]> {

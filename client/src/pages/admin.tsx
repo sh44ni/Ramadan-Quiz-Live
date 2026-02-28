@@ -136,6 +136,15 @@ export default function Admin() {
     memberIndex?: number;
   } | null>(null);
   const [editValues, setEditValues] = useState<{ nameEn?: string; nameAr?: string; value?: string }>({});
+  const [showAddTeamForm, setShowAddTeamForm] = useState(false);
+  const [addTeamForm, setAddTeamForm] = useState({
+    nameEn: "",
+    nameAr: "",
+    color: "#3b82f6",
+    captain: "",
+    secretKey: "",
+    members: ["", ""],
+  });
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -317,6 +326,36 @@ export default function Admin() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update team", variant: "destructive" });
+    },
+  });
+
+  const createTeamMutation = useMutation({
+    mutationFn: async (body: typeof addTeamForm) => {
+      const res = await adminFetch("POST", "/api/teams", body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      setShowAddTeamForm(false);
+      setAddTeamForm({ nameEn: "", nameAr: "", color: "#3b82f6", captain: "", secretKey: "", members: ["", ""] });
+      toast({ title: t("teamAdded") || "Team Added", description: t("teamAddedDesc") || "The team was added successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminFetch("DELETE", `/api/teams/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      toast({ title: t("teamDeleted") || "Team Deleted", description: t("teamDeletedDesc") || "The team was removed successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -1439,12 +1478,79 @@ export default function Admin() {
         </Card>
 
         <Card className="p-4 space-y-4 lg:col-span-2">
-          <h3
-            className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
-          >
-            <Users className="h-4 w-4 text-blue-500" />
-            {t("teamRoster")}
-          </h3>
+          <div className="flex justify-between items-center gap-2 flex-wrap">
+            <h3
+              className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
+            >
+              <Users className="h-4 w-4 text-blue-500" />
+              {t("teamRoster")}
+            </h3>
+            <Button
+              size="sm"
+              onClick={() => setShowAddTeamForm(!showAddTeamForm)}
+              variant="outline"
+              className="text-blue-500 border-blue-200"
+            >
+              {showAddTeamForm ? <ChevronUp className="h-3 w-3 mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+              {t("addTeam") || "Add Team"}
+            </Button>
+          </div>
+
+          {showAddTeamForm && (
+            <div className="p-4 rounded-md bg-muted/30 border space-y-3">
+              <h4 className={`text-xs font-bold ${isRTL ? "font-arabic" : ""}`}>New Team Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  value={addTeamForm.nameEn}
+                  onChange={(e) => setAddTeamForm({ ...addTeamForm, nameEn: e.target.value })}
+                  placeholder="Team Name (English)"
+                  className="text-sm"
+                />
+                <Input
+                  value={addTeamForm.nameAr}
+                  onChange={(e) => setAddTeamForm({ ...addTeamForm, nameAr: e.target.value })}
+                  placeholder="Team Name (Arabic)"
+                  className="text-sm font-arabic"
+                  dir="rtl"
+                />
+                <Input
+                  value={addTeamForm.captain}
+                  onChange={(e) => setAddTeamForm({ ...addTeamForm, captain: e.target.value })}
+                  placeholder="Captain Name"
+                  className="text-sm"
+                />
+                <Input
+                  value={addTeamForm.secretKey}
+                  onChange={(e) => setAddTeamForm({ ...addTeamForm, secretKey: e.target.value })}
+                  placeholder="Secret Key"
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">Team Color:</label>
+                <Input
+                  type="color"
+                  value={addTeamForm.color}
+                  onChange={(e) => setAddTeamForm({ ...addTeamForm, color: e.target.value })}
+                  className="w-12 h-8 p-1"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowAddTeamForm(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => createTeamMutation.mutate(addTeamForm)}
+                  disabled={createTeamMutation.isPending || !addTeamForm.nameEn || !addTeamForm.captain || !addTeamForm.secretKey}
+                  isLoading={createTeamMutation.isPending}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {t("save") || "Save Team"}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {teams.map((team: Team) => {
               const isEditingName = editingTeam?.teamId === team.id && editingTeam.field === "name";
@@ -1519,6 +1625,19 @@ export default function Admin() {
                           </span>
                           <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={startEditName} data-testid={`button-edit-name-${team.id}`}>
                             <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => {
+                              if (window.confirm(t("confirmDeleteTeam") || "Are you sure you want to delete this team?")) {
+                                deleteTeamMutation.mutate(team.id);
+                              }
+                            }}
+                            data-testid={`button-delete-team-${team.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </>
                       )}

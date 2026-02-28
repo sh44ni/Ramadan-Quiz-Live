@@ -3,7 +3,8 @@ import { type Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
-import { insertCategorySchema, insertQuestionSchema } from "@shared/schema";
+import { insertCategorySchema, insertQuestionSchema, insertTeamSchema } from "@shared/schema";
+import { ZodError } from "zod";
 import { broadcast, broadcastGameState, stopTimer } from "./websocket";
 
 const ADMIN_PASSWORD = process.env.SESSION_SECRET || "admin123";
@@ -37,6 +38,19 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/teams", requireAdmin, async (req, res) => {
+    try {
+      const data = insertTeamSchema.parse(req.body);
+      const team = await storage.createTeam(data);
+      res.status(201).json(team);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid team data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create team" });
+    }
+  });
+
   app.patch("/api/teams/:id", requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id as string);
@@ -52,6 +66,16 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update team" });
+    }
+  });
+
+  app.delete("/api/teams/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      await storage.deleteTeam(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete team" });
     }
   });
 

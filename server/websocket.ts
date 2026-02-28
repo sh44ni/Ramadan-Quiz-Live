@@ -29,30 +29,32 @@ interface InMemoryGameState {
   matchTeamIndex: number;   // which team in allTeamOrder is currently playing
 }
 
-const defaultGameState: InMemoryGameState = {
-  phase: "idle",
-  sessionId: null,
-  totalQuestions: 31,
-  questionsPerTeam: 5,
-  teamOrder: [],
-  teamPlayers: {},
-  currentTeamIndex: 0,
-  teamQuestionsAnswered: {},
-  usedQuestionNumbers: [],
-  selectedQuestionId: null,
-  questionNumberMap: {},
-  timerSeconds: 0,
-  timerRunning: false,
-  entryTeams: [],
-  pausedPhase: null,
-  pausedTimerSeconds: 0,
-  gameError: null,
-  customTeamOrder: [],
-  allTeamOrder: [],
-  matchTeamIndex: 0,
-};
+function createDefaultGameState(): InMemoryGameState {
+  return {
+    phase: "idle",
+    sessionId: null,
+    totalQuestions: 31,
+    questionsPerTeam: 5,
+    teamOrder: [],
+    teamPlayers: {},
+    currentTeamIndex: 0,
+    teamQuestionsAnswered: {},
+    usedQuestionNumbers: [],
+    selectedQuestionId: null,
+    questionNumberMap: {},
+    timerSeconds: 0,
+    timerRunning: false,
+    entryTeams: [],
+    pausedPhase: null,
+    pausedTimerSeconds: 0,
+    gameError: null,
+    customTeamOrder: [],
+    allTeamOrder: [],
+    matchTeamIndex: 0,
+  };
+}
 
-let gameState: InMemoryGameState = { ...defaultGameState };
+let gameState: InMemoryGameState = createDefaultGameState();
 let wss: WebSocketServer;
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -194,6 +196,7 @@ async function startEntryPhase() {
 }
 
 async function endEntryPhase() {
+  log(`endEntryPhase: entryTeams=${JSON.stringify(gameState.entryTeams)}, usedQ=${gameState.usedQuestionNumbers.length}, totalQ=${gameState.totalQuestions}, mapSize=${Object.keys(gameState.questionNumberMap).length}`, "ws");
   if (gameState.entryTeams.length < 1) {
     stopTimer();
     // Instead of crashing the whole game, just pretend this team finished 0 questions
@@ -236,7 +239,9 @@ async function startSelectionPhase() {
   gameState.selectedQuestionId = null;
 
   const available = getAvailableNumbers();
+  log(`startSelectionPhase: available=${available.length}, totalQ=${gameState.totalQuestions}, usedQ=${gameState.usedQuestionNumbers.length}, mapSize=${Object.keys(gameState.questionNumberMap).length}, teamQAnswered=${JSON.stringify(gameState.teamQuestionsAnswered)}`, "ws");
   if (available.length === 0) {
+    log(`startSelectionPhase: no questions available — ending game`, "ws");
     await endGame();
     return;
   }
@@ -577,7 +582,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
         const activeQuestions = (await storage.getQuestions()).filter((q) => q.isActive !== false);
 
         gameState = {
-          ...defaultGameState,
+          ...createDefaultGameState(),
           sessionId: session.id,
           totalQuestions: Math.min(31, activeQuestions.length),
           customTeamOrder: prevCustomOrder,
@@ -755,7 +760,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
         if (gameState.sessionId) {
           await storage.updateSession(gameState.sessionId, { status: "finished" });
         }
-        gameState = { ...defaultGameState };
+        gameState = createDefaultGameState();
         broadcast({ type: "game-reset" });
         broadcast({ type: "phase-changed", phase: "idle" });
         await broadcastFullState();
