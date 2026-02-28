@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { log } from "./index";
 
-type GamePhase = "idle" | "entry" | "selection" | "preparation" | "answer" | "paused" | "team-complete" | "finished";
+type GamePhase = "idle" | "entry" | "team-preparation" | "selection" | "preparation" | "answer" | "paused" | "break" | "team-complete" | "finished";
 
 interface InMemoryGameState {
   phase: GamePhase;
@@ -185,7 +185,7 @@ async function startEntryPhase() {
 
   const expectedTeamId = gameState.allTeamOrder[gameState.matchTeamIndex] ?? null;
 
-  startTimer(600, async () => {
+  startTimer(120, async () => {
     await endEntryPhase();
   });
 
@@ -216,7 +216,19 @@ async function endEntryPhase() {
   gameState.teamQuestionsAnswered[teamId] = 0;
 
   broadcast({ type: "entry-closed" });
-  await startSelectionPhase();
+  await startTeamPreparationPhase();
+}
+
+async function startTeamPreparationPhase() {
+  gameState.phase = "team-preparation";
+
+  broadcast({ type: "phase-changed", phase: "team-preparation" });
+
+  startTimer(10, async () => {
+    await startSelectionPhase();
+  });
+
+  await broadcastFullState();
 }
 
 async function startSelectionPhase() {
@@ -671,6 +683,16 @@ async function handleMessage(ws: WebSocket, raw: string) {
         break;
       }
 
+      case "admin-break": {
+        if (gameState.phase !== "team-complete" && gameState.phase !== "idle") return;
+        gameState.pausedPhase = gameState.phase;
+        gameState.phase = "break";
+
+        broadcast({ type: "phase-changed", phase: "break" });
+        await broadcastFullState();
+        break;
+      }
+
       case "admin-pause": {
         if (gameState.phase === "idle" || gameState.phase === "finished" || gameState.phase === "paused" || gameState.phase === "team-complete") return;
         gameState.pausedPhase = gameState.phase;
@@ -689,7 +711,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
       }
 
       case "admin-resume": {
-        if (gameState.phase !== "paused" || !gameState.pausedPhase) return;
+        if ((gameState.phase !== "paused" && gameState.phase !== "break") || !gameState.pausedPhase) return;
         const resumePhase = gameState.pausedPhase;
         gameState.phase = resumePhase;
         gameState.pausedPhase = null;
@@ -708,6 +730,7 @@ async function handleMessage(ws: WebSocket, raw: string) {
           const getTimerCallback = () => {
             switch (resumePhase) {
               case "entry": return () => endEntryPhase();
+              case "team-preparation": return () => startSelectionPhase();
               case "selection": return () => handleSelectionTimeout();
               case "preparation": return () => startAnswerPhase();
               case "answer": return () => handleAnswerTimeout();

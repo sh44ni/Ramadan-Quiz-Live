@@ -16,36 +16,42 @@ const teamsData = [
     // Position 1 — plays first
     nameEn: "Team 1: Ahl Al-Raya", nameAr: "الفريق الأول: أهل الراية", color: "#F59E0B",
     captain: "حافظ سعيد",
+    secretKey: "111111",
     members: ["عصام سعيد", "محمود سعيد", "عبد الله سعيد"],
   },
   {
     // Position 2
     nameEn: "Team 2: Marsa Al-Fikr", nameAr: "الفريق الثاني: مرسى الفكر", color: "#F97316",
     captain: "حميد خالد",
+    secretKey: "222222",
     members: ["عمر ساعد", "إبراهيم المكتومي", "عبد الله الكيومي"],
   },
   {
     // Position 3
     nameEn: "Team 3: Al-Fallah", nameAr: "الفريق الثالث: الفلاح", color: "#10B981",
     captain: "عمر سعيد",
+    secretKey: "333333",
     members: ["غيث سعيد", "فلاح السعيدي"],
   },
   {
     // Position 4
     nameEn: "Team 4: Falaj Gharba", nameAr: "الفريق الرابع: فلج غربة", color: "#8B5CF6",
     captain: "فهد محمد",
+    secretKey: "444444",
     members: ["فايز سيف", "نبيل سيف", "هشام سيف"],
   },
   {
     // Position 5
     nameEn: "Team 5: Al-Nukhba", nameAr: "الفريق الخامس: النخبة", color: "#EF4444",
     captain: "أحمد علي حمدان",
+    secretKey: "555555",
     members: ["معتز سعيد", "الوارث مبارك", "مصباح"],
   },
   {
     // Position 6 — plays last
     nameEn: "Team 6: Al-Bidaya", nameAr: "الفريق السادس: البداية", color: "#3B82F6",
     captain: "مهاجر محمد",
+    secretKey: "666666",
     members: ["حامد محمد", "حازم محمد", "محمد سعيد (أبو مهاجر)"],
   },
 ];

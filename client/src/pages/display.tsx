@@ -19,6 +19,7 @@ import {
   Hash,
   Clock,
   Eye,
+  Activity,
 } from "lucide-react";
 
 export default function Display() {
@@ -212,11 +213,10 @@ export default function Display() {
                     key={team.id}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className={`p-4 rounded-xl backdrop-blur-sm border-2 transition-all ${
-                      joined
+                    className={`p-4 rounded-xl backdrop-blur-sm border-2 transition-all ${joined
                         ? "bg-emerald-500/15 border-emerald-400/40"
                         : "bg-white/5 border-white/10"
-                    }`}
+                      }`}
                     data-testid={`display-entry-team-${team.id}`}
                   >
                     <div className="flex items-center gap-2 mb-2">
@@ -390,9 +390,8 @@ export default function Display() {
                   initial={{ opacity: 0, x: -50 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.15 }}
-                  className={`flex items-center gap-5 p-5 rounded-2xl backdrop-blur-sm ${
-                    index === 0 ? "bg-amber-500/20 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/10" : "bg-white/8 border border-white/10"
-                  }`}
+                  className={`flex items-center gap-5 p-5 rounded-2xl backdrop-blur-sm ${index === 0 ? "bg-amber-500/20 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/10" : "bg-white/8 border border-white/10"
+                    }`}
                 >
                   <div className="flex items-center justify-center w-12 shrink-0">
                     {getRankIcon(index) || (
@@ -428,11 +427,11 @@ export default function Display() {
 
   const options = currentQuestion
     ? [
-        { key: "a", text: language === "ar" ? currentQuestion.optionAAr : currentQuestion.optionAEn },
-        { key: "b", text: language === "ar" ? currentQuestion.optionBAr : currentQuestion.optionBEn },
-        { key: "c", text: language === "ar" ? currentQuestion.optionCAr : currentQuestion.optionCEn },
-        { key: "d", text: language === "ar" ? currentQuestion.optionDAr : currentQuestion.optionDEn },
-      ]
+      { key: "a", text: language === "ar" ? currentQuestion.optionAAr : currentQuestion.optionAEn },
+      { key: "b", text: language === "ar" ? currentQuestion.optionBAr : currentQuestion.optionBEn },
+      { key: "c", text: language === "ar" ? currentQuestion.optionCAr : currentQuestion.optionCEn },
+      { key: "d", text: language === "ar" ? currentQuestion.optionDAr : currentQuestion.optionDEn },
+    ]
     : [];
 
   const category = currentQuestion
@@ -498,6 +497,33 @@ export default function Display() {
         <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <AnimatePresence mode="wait">
+              {phase === "team-preparation" && (
+                <motion.div
+                  key="display-team-preparation"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  className="flex-1 flex flex-col items-center justify-center p-12 text-center"
+                >
+                  <motion.div
+                    animate={{ y: [0, -15, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="mb-8 rounded-full bg-amber-500/20 p-6"
+                  >
+                    <Activity className="h-32 w-32 xl:h-40 xl:w-40 text-amber-500" />
+                  </motion.div>
+                  <h2 className={`text-6xl xl:text-8xl font-bold text-white mb-6 ${isRTL ? "font-arabic" : ""}`}>
+                    {t("getReady")}
+                  </h2>
+                  <p className={`text-3xl xl:text-5xl text-blue-200 mt-4 ${isRTL ? "font-arabic" : ""}`}>
+                    {t("teamPreparationDesc")}
+                  </p>
+                  <div className="mt-16 text-8xl xl:text-9xl font-extrabold text-amber-400 drop-shadow-[0_0_25px_rgba(251,191,36,0.6)]">
+                    {timer.seconds}
+                  </div>
+                </motion.div>
+              )}
+
               {phase === "selection" && (
                 <motion.div
                   key="display-selection"
@@ -611,13 +637,12 @@ export default function Display() {
                           className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-300 ${getOptionDisplayStyle(option.key)}`}
                           data-testid={`display-option-${option.key}`}
                         >
-                          <span className={`flex items-center justify-center w-10 h-10 rounded-full text-base font-bold shrink-0 ${
-                            answerResult && option.key === answerResult.correctAnswer
+                          <span className={`flex items-center justify-center w-10 h-10 rounded-full text-base font-bold shrink-0 ${answerResult && option.key === answerResult.correctAnswer
                               ? "bg-emerald-500 text-white"
                               : answerResult && option.key === answerResult.answerGiven && !answerResult.isCorrect
                                 ? "bg-red-500 text-white"
                                 : "bg-white/10 text-white"
-                          }`}>
+                            }`}>
                             {option.key.toUpperCase()}
                           </span>
                           <span className={`flex-1 text-base md:text-lg font-medium ${isRTL ? "font-arabic" : ""}`}>
@@ -654,11 +679,10 @@ export default function Display() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.5, y: -30 }}
                         transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className={`flex items-center justify-center gap-5 p-5 rounded-2xl text-center font-bold shrink-0 ${
-                          answerResult.isCorrect
+                        className={`flex items-center justify-center gap-5 p-5 rounded-2xl text-center font-bold shrink-0 ${answerResult.isCorrect
                             ? "bg-emerald-500/20 text-emerald-300 border-2 border-emerald-400/40"
                             : "bg-red-500/20 text-red-300 border-2 border-red-400/40"
-                        }`}
+                          }`}
                         data-testid="display-result"
                       >
                         {answerResult.isCorrect ? (
@@ -742,9 +766,8 @@ export default function Display() {
                   <motion.div
                     key={team.id}
                     layout
-                    className={`p-3 rounded-xl transition-all backdrop-blur-sm ${
-                      isCurrent ? "bg-white/12 ring-2 ring-amber-400/50 shadow-lg" : "bg-white/5 border border-white/8"
-                    }`}
+                    className={`p-3 rounded-xl transition-all backdrop-blur-sm ${isCurrent ? "bg-white/12 ring-2 ring-amber-400/50 shadow-lg" : "bg-white/5 border border-white/8"
+                      }`}
                     data-testid={`display-team-score-${team.id}`}
                   >
                     <div className="flex items-center gap-2 mb-1.5">

@@ -27,6 +27,8 @@ import {
   Hash,
   Eye,
   BookOpen,
+  Activity,
+  Coffee,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -508,6 +510,33 @@ export default function Game() {
           </Card>
 
           <AnimatePresence mode="wait">
+            {phase === "team-preparation" && (
+              <motion.div
+                key="team-preparation"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                className="flex flex-col items-center justify-center p-12 text-center"
+              >
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="mb-6 rounded-full bg-amber-500/20 p-4"
+                >
+                  <Activity className="h-16 w-16 text-amber-500" />
+                </motion.div>
+                <h2 className={`text-3xl font-bold text-white mb-2 ${isRTL ? "font-arabic" : ""}`}>
+                  {t("getReady")}
+                </h2>
+                <p className={`text-xl text-blue-200 ${isRTL ? "font-arabic" : ""}`}>
+                  {t("teamPreparationDesc")}
+                </p>
+                <div className="mt-8 text-6xl font-bold text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]">
+                  {timer.seconds}
+                </div>
+              </motion.div>
+            )}
+
             {phase === "selection" && (
               <motion.div
                 key="selection"
@@ -636,11 +665,45 @@ export default function Game() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <Card className="p-8 text-center">
-                  <Clock className="h-12 w-12 mx-auto mb-3 text-amber-500" />
-                  <h3 className={`text-xl font-bold ${isRTL ? "font-arabic" : ""}`}>
+                <Card className="p-8 text-center flex flex-col items-center justify-center">
+                  <motion.div
+                    animate={{ rotate: [-5, 5, -5, 5, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+                    className="mb-4 text-amber-500 bg-amber-500/10 p-4 rounded-full"
+                  >
+                    <Clock className="h-10 w-10" />
+                  </motion.div>
+                  <h3 className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-amber-600 ${isRTL ? "font-arabic" : ""}`}>
                     {t("paused")}
                   </h3>
+                  <p className={`text-muted-foreground mt-2 ${isRTL ? "font-arabic" : ""}`}>
+                    {t("gamePausedSubtitle")}
+                  </p>
+                </Card>
+              </motion.div>
+            )}
+
+            {phase === "break" && (
+              <motion.div
+                key="break"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+              >
+                <Card className="p-10 text-center flex flex-col items-center justify-center min-h-[40vh]">
+                  <motion.div
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="mb-6 text-indigo-500 bg-indigo-500/10 p-5 rounded-full"
+                  >
+                    <Coffee className="h-12 w-12" />
+                  </motion.div>
+                  <h3 className={`text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500 ${isRTL ? "font-arabic" : ""}`}>
+                    {t("weWillBeRightBack")}
+                  </h3>
+                  <p className={`text-lg text-muted-foreground mt-4 max-w-md mx-auto leading-relaxed ${isRTL ? "font-arabic" : ""}`}>
+                    {t("breakDesc")}
+                  </p>
                 </Card>
               </motion.div>
             )}
@@ -703,7 +766,7 @@ export default function Game() {
             />
           </Card>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

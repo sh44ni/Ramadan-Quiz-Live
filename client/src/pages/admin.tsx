@@ -41,6 +41,7 @@ import {
   Plus,
   Minus,
   Eye,
+  Coffee,
   SkipForward,
   Mail,
   Trash2,
@@ -70,8 +71,9 @@ import {
   Languages,
   BarChart3,
   User,
+  KeyRound,
 } from "lucide-react";
-import type { Team, GameSession, TeamScore, AuthorizedEmail, Category, Question } from "@shared/schema";
+import type { Team, GameSession, TeamScore, Category, Question } from "@shared/schema";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -82,12 +84,6 @@ export default function Admin() {
   const [adminToken, setAdminToken] = useState("");
   const [password, setPassword] = useState("");
   const [scoreAdjust, setScoreAdjust] = useState<Record<number, number>>({});
-  const [newEmail, setNewEmail] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newPlayerName, setNewPlayerName] = useState("");
-  const [newTeamId, setNewTeamId] = useState<string>("");
-  const [bulkText, setBulkText] = useState("");
-  const [showBulk, setShowBulk] = useState(false);
   const [showAdminGuide, setShowAdminGuide] = useState(false);
 
   const {
@@ -101,6 +97,7 @@ export default function Admin() {
     adminResume,
     adminEnd,
     adminReset,
+    adminBreak,
     adminSkipEntry,
     adminSetTeam,
     adminAdjustScore,
@@ -135,7 +132,7 @@ export default function Admin() {
   const [orderSavedFlash, setOrderSavedFlash] = useState(false);
   const [editingTeam, setEditingTeam] = useState<{
     teamId: number;
-    field: "name" | "captain" | "member";
+    field: "name" | "captain" | "member" | "secretKey";
     memberIndex?: number;
   } | null>(null);
   const [editValues, setEditValues] = useState<{ nameEn?: string; nameAr?: string; value?: string }>({});
@@ -184,14 +181,6 @@ export default function Admin() {
     enabled: isAuthenticated,
   });
 
-  const { data: authorizedEmailsData } = useQuery<AuthorizedEmail[]>({
-    queryKey: ["/api/admin/authorized-emails"],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const res = await adminFetch("GET", "/api/admin/authorized-emails");
-      return res.json();
-    },
-  });
 
   const { data: categoriesData } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
@@ -316,89 +305,6 @@ export default function Admin() {
     },
   });
 
-
-  const addEmailMutation = useMutation({
-    mutationFn: async () => {
-      const res = await adminFetch("POST", "/api/admin/authorized-emails", {
-        email: newEmail.trim(),
-        name: newName.trim(),
-        playerName: newPlayerName.trim() || undefined,
-        teamId: newTeamId && newTeamId !== "none" ? Number(newTeamId) : undefined,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/authorized-emails"] });
-      setNewEmail("");
-      setNewName("");
-      setNewPlayerName("");
-      setNewTeamId("");
-      toast({ title: t("emailAdded"), description: t("emailAddedDesc") });
-    },
-    onError: (error: Error) => {
-      const msg = error.message;
-      if (msg.includes("409")) {
-        toast({ title: t("error"), description: t("emailExists"), variant: "destructive" });
-      } else {
-        toast({ title: t("error"), description: msg, variant: "destructive" });
-      }
-    },
-  });
-
-  const removeEmailMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await adminFetch("DELETE", `/api/admin/authorized-emails/${id}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/authorized-emails"] });
-      toast({ title: t("emailRemoved"), description: t("emailRemovedDesc") });
-    },
-  });
-
-  const sendInvitationMutation = useMutation({
-    mutationFn: async ({ email, name }: { email: string; name: string }) => {
-      const res = await adminFetch("POST", "/api/admin/send-invitation", { email, name });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: t("invitationSent"), description: t("invitationSentDesc") });
-    },
-    onError: (error: Error) => {
-      toast({ title: t("error"), description: error.message, variant: "destructive" });
-    },
-  });
-
-  const bulkImportMutation = useMutation({
-    mutationFn: async () => {
-      const lines = bulkText.trim().split("\n").filter(Boolean);
-      const results = [];
-      for (const line of lines) {
-        const parts = line.split(",").map((p) => p.trim());
-        if (parts.length >= 2) {
-          const [email, playerName, teamIdStr] = parts;
-          try {
-            const res = await adminFetch("POST", "/api/admin/authorized-emails", {
-              email,
-              name: playerName,
-              playerName,
-              teamId: teamIdStr ? Number(teamIdStr) : undefined,
-            });
-            results.push(await res.json());
-          } catch (e) {
-          }
-        }
-      }
-      return results;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/authorized-emails"] });
-      setBulkText("");
-      setShowBulk(false);
-      toast({ title: t("imported"), description: t("importedDesc") });
-    },
-  });
-
   const updateTeamMutation = useMutation({
     mutationFn: async ({ teamId, data }: { teamId: number; data: Record<string, unknown> }) => {
       const res = await adminFetch("PATCH", `/api/teams/${teamId}`, data);
@@ -516,7 +422,6 @@ export default function Admin() {
 
   const session = wsGameState.session;
   const scores = wsGameState.scores || [];
-  const authorizedEmails = authorizedEmailsData || [];
   const allQuestions = questionsData || wsGameState.questions || [];
   const totalQuestions = wsGameState.totalQuestions || allQuestions.length || 31;
   const usedQuestionNumbers = wsGameState.usedQuestionNumbers || [];
@@ -550,6 +455,8 @@ export default function Admin() {
   const phaseLabel = (() => {
     switch (gamePhase) {
       case "entry": return t("entryPhase");
+      case "team-preparation": return t("getReady");
+      case "break": return t("breakPhase");
       case "selection": return t("phaseSelection");
       case "preparation": return t("phasePreparation");
       case "answer": return t("phaseAnswer");
@@ -561,15 +468,17 @@ export default function Admin() {
   })();
 
   const statusColor =
-    gamePhase === "selection" || gamePhase === "preparation" || gamePhase === "answer" || gamePhase === "entry"
+    gamePhase === "selection" || gamePhase === "preparation" || gamePhase === "answer" || gamePhase === "entry" || gamePhase === "team-preparation"
       ? "bg-emerald-500"
       : gamePhase === "paused"
         ? "bg-amber-500"
-        : gamePhase === "team-complete"
-          ? "bg-cyan-500"
-          : gamePhase === "finished"
-            ? "bg-red-500"
-            : "bg-muted-foreground";
+        : gamePhase === "break"
+          ? "bg-indigo-500"
+          : gamePhase === "team-complete"
+            ? "bg-cyan-500"
+            : gamePhase === "finished"
+              ? "bg-red-500"
+              : "bg-muted-foreground";
 
   const statusText = phaseLabel;
 
@@ -665,7 +574,7 @@ export default function Admin() {
             <Mail className="h-4 w-4 text-emerald-500" />
             <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("manageEmails")}</span>
           </div>
-          <p className="text-2xl font-bold">{authorizedEmails.length}</p>
+          <p className="text-2xl font-bold">{/* authorizedEmails.length */ 0}</p>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -693,10 +602,12 @@ export default function Admin() {
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>{t("currentPhase")}</span>
                 <Badge className={`text-xs ${gamePhase === "entry" ? "bg-purple-500/15 text-purple-600" :
-                  gamePhase === "selection" ? "bg-blue-500/15 text-blue-600" :
-                    gamePhase === "preparation" ? "bg-amber-500/15 text-amber-600" :
-                      gamePhase === "answer" ? "bg-emerald-500/15 text-emerald-600" :
-                        "bg-orange-500/15 text-orange-600"
+                  gamePhase === "team-preparation" ? "bg-amber-500/15 text-amber-600" :
+                    gamePhase === "break" ? "bg-indigo-500/15 text-indigo-600" :
+                      gamePhase === "selection" ? "bg-blue-500/15 text-blue-600" :
+                        gamePhase === "preparation" ? "bg-amber-500/15 text-amber-600" :
+                          gamePhase === "answer" ? "bg-emerald-500/15 text-emerald-600" :
+                            "bg-orange-500/15 text-orange-600"
                   }`}>{phaseLabel}</Badge>
               </div>
               {gamePhase === "entry" && expectedEntryTeam && (
@@ -809,23 +720,36 @@ export default function Admin() {
             )}
 
             {gamePhase === "team-complete" && (
-              <Button
-                className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold text-base"
-                onClick={() => handleWsAction("next-team", adminNextTeam)}
-                disabled={actionLoading !== null}
-                isLoading={actionLoading === "next-team"}
-                data-testid="button-next-team"
-              >
-                <Play className="h-4 w-4" />
-                <span className={isRTL ? "font-arabic" : ""}>
-                  {nextTeamObj
-                    ? `${t("nextTeamBtn")} → ${language === "ar" ? nextTeamObj.nameAr : nextTeamObj.nameEn}`
-                    : t("nextTeamBtn")}
-                </span>
-              </Button>
+              <>
+                <Button
+                  className="col-span-2 gold-gradient border-amber-400/30 text-white font-bold text-base"
+                  onClick={() => handleWsAction("next-team", adminNextTeam)}
+                  disabled={actionLoading !== null}
+                  isLoading={actionLoading === "next-team"}
+                  data-testid="button-next-team"
+                >
+                  <Play className="h-4 w-4" />
+                  <span className={isRTL ? "font-arabic" : ""}>
+                    {nextTeamObj
+                      ? `${t("nextTeamBtn")} → ${language === "ar" ? nextTeamObj.nameAr : nextTeamObj.nameEn}`
+                      : t("nextTeamBtn")}
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="col-span-2 border-indigo-400 text-indigo-500 font-bold"
+                  onClick={() => handleWsAction("break", adminBreak)}
+                  disabled={actionLoading !== null}
+                  isLoading={actionLoading === "break"}
+                  data-testid="button-break"
+                >
+                  <Coffee className="h-4 w-4 mr-2" />
+                  <span className={isRTL ? "font-arabic" : ""}>{t("takeABreak")}</span>
+                </Button>
+              </>
             )}
 
-            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "entry" && gamePhase !== "team-complete" && (
+            {gamePhase !== "idle" && gamePhase !== "finished" && gamePhase !== "paused" && gamePhase !== "break" && gamePhase !== "entry" && gamePhase !== "team-complete" && (
               <Button
                 variant="secondary"
                 onClick={() => handleWsAction("pause", adminPause)}
@@ -838,7 +762,7 @@ export default function Admin() {
               </Button>
             )}
 
-            {gamePhase === "paused" && (
+            {(gamePhase === "paused" || gamePhase === "break") && (
               <Button
                 onClick={() => handleWsAction("resume", adminResume)}
                 disabled={actionLoading !== null}
@@ -1028,7 +952,7 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 <p className={`text-sm text-muted-foreground text-center py-4 ${isRTL ? "font-arabic" : ""}`}>
-                  {gamePhase === "selection" ? t("waitingForSelection") : t("waitingForAdmin")}
+                  {gamePhase === "selection" ? t("waitingForSelection") : gamePhase === "team-preparation" ? t("getReady") : t("waitingForAdmin")}
                 </p>
               </div>
             )}
@@ -1525,6 +1449,7 @@ export default function Admin() {
             {teams.map((team: Team) => {
               const isEditingName = editingTeam?.teamId === team.id && editingTeam.field === "name";
               const isEditingCaptain = editingTeam?.teamId === team.id && editingTeam.field === "captain";
+              const isEditingSecret = editingTeam?.teamId === team.id && editingTeam.field === "secretKey";
               const isSaving = updateTeamMutation.isPending;
 
               const startEditName = () => {
@@ -1535,6 +1460,10 @@ export default function Admin() {
                 setEditingTeam({ teamId: team.id, field: "captain" });
                 setEditValues({ value: team.captain });
               };
+              const startEditSecret = () => {
+                setEditingTeam({ teamId: team.id, field: "secretKey" });
+                setEditValues({ value: team.secretKey });
+              };
               const startEditMember = (idx: number) => {
                 setEditingTeam({ teamId: team.id, field: "member", memberIndex: idx });
                 setEditValues({ value: team.members?.[idx] || "" });
@@ -1543,6 +1472,7 @@ export default function Admin() {
 
               const saveName = () => updateTeamMutation.mutate({ teamId: team.id, data: { nameEn: editValues.nameEn, nameAr: editValues.nameAr } });
               const saveCaptain = () => updateTeamMutation.mutate({ teamId: team.id, data: { captain: editValues.value } });
+              const saveSecret = () => updateTeamMutation.mutate({ teamId: team.id, data: { secretKey: editValues.value } });
               const saveMember = (idx: number) => {
                 const newMembers = [...(team.members || [])];
                 newMembers[idx] = editValues.value || "";
@@ -1622,6 +1552,38 @@ export default function Admin() {
                           </Button>
                         </div>
                       )}
+
+                      {/* Secret Key Row */}
+                      {isEditingSecret ? (
+                        <div className="space-y-1 p-1.5 rounded bg-blue-500/10">
+                          <div className="flex items-center gap-1">
+                            <KeyRound className="h-3 w-3 text-blue-500 shrink-0" />
+                            <Input
+                              value={editValues.value || ""}
+                              onChange={(e) => setEditValues((v) => ({ ...v, value: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                              className="h-6 text-xs flex-1 tracking-widest font-mono text-center"
+                              dir="ltr"
+                              maxLength={6}
+                              data-testid={`input-secret-${team.id}`}
+                            />
+                          </div>
+                          <div className="flex gap-1 ps-4">
+                            <Button size="sm" className="h-6 text-xs px-2" onClick={saveSecret} disabled={isSaving} isLoading={isSaving} data-testid={`button-save-secret-${team.id}`}>
+                              {t("save")}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={cancelEdit}>{t("cancel")}</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs p-1.5 rounded bg-blue-500/10">
+                          <KeyRound className="h-3 w-3 text-blue-500 shrink-0" />
+                          <span className="font-mono tracking-widest text-muted-foreground flex-1" dir="ltr">{team.secretKey}</span>
+                          <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={startEditSecret} data-testid={`button-edit-secret-${team.id}`}>
+                            <Pencil className="h-2.5 w-2.5" />
+                          </Button>
+                        </div>
+                      )}
+
                       {team.members && team.members.map((member, idx) => {
                         const isEditingThisMember = editingTeam?.teamId === team.id && editingTeam.field === "member" && editingTeam.memberIndex === idx;
                         return isEditingThisMember ? (
@@ -1656,198 +1618,6 @@ export default function Admin() {
               );
             })}
           </div>
-        </Card>
-
-        <Card className="p-4 space-y-4 lg:col-span-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3
-              className={`text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 ${isRTL ? "font-arabic" : ""}`}
-            >
-              <Mail className="h-4 w-4 text-emerald-500" />
-              {t("manageEmails")}
-              <Badge variant="secondary" className="text-[10px]">{authorizedEmails.length}</Badge>
-            </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowBulk(!showBulk)}
-              data-testid="button-toggle-bulk"
-            >
-              <Upload className="h-3 w-3" />
-              <span className={isRTL ? "font-arabic" : ""}>{t("bulkImport")}</span>
-            </Button>
-          </div>
-
-          {showBulk && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="space-y-2 p-3 rounded-md bg-muted/30"
-            >
-              <Textarea
-                placeholder={t("bulkImportPlaceholder")}
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                rows={4}
-                dir="ltr"
-                className="text-xs font-mono"
-                data-testid="input-bulk-import"
-              />
-              <Button
-                size="sm"
-                onClick={() => bulkImportMutation.mutate()}
-                disabled={bulkImportMutation.isPending || !bulkText.trim()}
-                isLoading={bulkImportMutation.isPending}
-                data-testid="button-bulk-import"
-              >
-                {!bulkImportMutation.isPending && <Upload className="h-3 w-3" />}
-                <span className={isRTL ? "font-arabic" : ""}>{t("importEmails")}</span>
-              </Button>
-            </motion.div>
-          )}
-
-          <p className={`text-xs text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-            One captain email per team — the captain logs in and plays on behalf of their team
-          </p>
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Select
-                value={newTeamId}
-                onValueChange={(val) => {
-                  if (val) {
-                    const team = teams.find((t: Team) => String(t.id) === val);
-                    if (team) {
-                      setNewTeamId(val);
-                      setNewName(team.captain);
-                      setNewPlayerName(team.captain);
-                    }
-                  }
-                }}
-              >
-                <SelectTrigger data-testid="select-team-captain" className="sm:w-56">
-                  <SelectValue placeholder="Select team">
-                    {newTeamId && (() => {
-                      const team = teams.find((t: Team) => String(t.id) === newTeamId);
-                      return team ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
-                          <span className="font-arabic truncate">{language === "ar" ? team.nameAr : team.nameEn}</span>
-                        </div>
-                      ) : null;
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {teams.map((team: Team) => {
-                    const alreadyRegistered = authorizedEmails.some((e: AuthorizedEmail) => e.teamId === team.id);
-                    return (
-                      <SelectItem key={team.id} value={String(team.id)} disabled={alreadyRegistered}>
-                        <div className="flex items-center gap-2 w-full">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-arabic text-sm">{language === "ar" ? team.nameAr : team.nameEn}</span>
-                            <span className="text-xs text-muted-foreground font-arabic">{team.captain}</span>
-                          </div>
-                          {alreadyRegistered && <Badge variant="secondary" className="text-[9px] ml-auto">✓</Badge>}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <Input
-                type="email"
-                placeholder={t("emailAddress")}
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                dir="ltr"
-                data-testid="input-new-email"
-                className="flex-1"
-              />
-              <Button
-                onClick={() => addEmailMutation.mutate()}
-                disabled={addEmailMutation.isPending || !newEmail.trim() || !newName.trim()}
-                isLoading={addEmailMutation.isPending}
-                className="shrink-0"
-                data-testid="button-add-email"
-              >
-                {!addEmailMutation.isPending && <Plus className="h-4 w-4" />}
-                <span className={isRTL ? "font-arabic" : ""}>{t("addEmail")}</span>
-              </Button>
-            </div>
-          </div>
-
-          {authorizedEmails.length === 0 ? (
-            <p className={`text-sm text-muted-foreground text-center py-6 ${isRTL ? "font-arabic" : ""}`}>
-              {t("noAuthorizedEmails")}
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {authorizedEmails.map((entry) => (
-                <motion.div
-                  key={entry.id}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 p-2.5 rounded-md bg-muted/30"
-                  data-testid={`row-email-${entry.id}`}
-                >
-                  {(() => {
-                    const team = entry.teamId ? teams.find((t: Team) => t.id === entry.teamId) : null;
-                    return (
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-2 ring-white/10"
-                        style={{ backgroundColor: team ? team.color + "33" : undefined }}
-                      >
-                        {team
-                          ? <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: team.color }} />
-                          : <Mail className="h-3.5 w-3.5 text-primary" />
-                        }
-                      </div>
-                    );
-                  })()}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium truncate" dir="ltr">{entry.email}</span>
-                      {entry.playerName && (
-                        <span className="text-xs text-amber-600 font-arabic font-semibold">({entry.playerName})</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {entry.teamId && (
-                        <Badge variant="secondary" className="text-[10px] font-arabic">
-                          {getTeamName(entry.teamId)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() =>
-                        sendInvitationMutation.mutate({ email: entry.email, name: entry.name })
-                      }
-                      disabled={sendInvitationMutation.isPending}
-                      isLoading={sendInvitationMutation.isPending}
-                      data-testid={`button-send-invitation-${entry.id}`}
-                    >
-                      {!sendInvitationMutation.isPending && <Send className="h-3 w-3" />}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => removeEmailMutation.mutate(entry.id)}
-                      disabled={removeEmailMutation.isPending}
-                      isLoading={removeEmailMutation.isPending}
-                      data-testid={`button-remove-email-${entry.id}`}
-                    >
-                      {!removeEmailMutation.isPending && <Trash2 className="h-3 w-3 text-destructive" />}
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
         </Card>
       </div>
     </div>

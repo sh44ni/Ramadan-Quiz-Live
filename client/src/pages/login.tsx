@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/useLanguage";
 import { useLocation } from "wouter";
@@ -6,10 +6,19 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Mail, KeyRound, ArrowLeft, Loader2, Moon, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { KeyRound, ArrowLeft, Loader2, Star } from "lucide-react";
 import logoImg from "@assets/logoo_1771549026301.png";
+import type { Team } from "@shared/schema";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -17,44 +26,33 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<"email" | "otp">("email");
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [secretKey, setSecretKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleRequestOtp = async () => {
-    if (!email.trim()) return;
-    setIsLoading(true);
-    try {
-      const res = await apiRequest("POST", "/api/auth/request-otp", { email: email.trim() });
-      const data = await res.json();
-      setStep("otp");
-      toast({ title: t("otpSent"), description: t("checkEmail") });
-    } catch (error: any) {
-      const msg = error?.message || "";
-      if (msg.includes("403") || msg.includes("not authorized")) {
-        toast({ title: t("error"), description: t("emailNotAuthorized"), variant: "destructive" });
-      } else {
-        toast({ title: t("error"), description: t("otpSendFailed"), variant: "destructive" });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: teams = [], isLoading: isLoadingTeams } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
+  });
 
-  const handleVerifyOtp = async () => {
-    if (!otp.trim()) return;
+  const handleLogin = async () => {
+    if (!selectedTeamId || !secretKey.trim()) return;
     setIsLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/verify-otp", { email: email.trim(), code: otp.trim() });
+      const res = await apiRequest("POST", "/api/auth/login-team", {
+        teamId: selectedTeamId,
+        secretKey: secretKey.trim()
+      });
       const data = await res.json();
       localStorage.setItem("playerToken", data.token);
-      localStorage.setItem("playerEmail", data.email);
+      localStorage.setItem("teamId", data.teamId.toString());
       if (data.playerName) localStorage.setItem("playerName", data.playerName);
-      toast({ title: t("loginSuccess"), description: data.playerName ? `${t("welcomePlayer")} ${data.playerName}` : t("welcomePlayer") });
+      toast({
+        title: t("loginSuccess"),
+        description: data.playerName ? `${t("welcomePlayer").replace("{{name}}", data.playerName)}` : t("loginSuccess")
+      });
       setLocation("/game");
-    } catch (error) {
-      toast({ title: t("error"), description: t("invalidOtp"), variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: t("error"), description: t("invalidSecret"), variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -96,86 +94,59 @@ export default function Login() {
                 {t("playerLogin")}
               </h2>
               <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                {step === "email" ? t("enterEmailDesc") : t("enterOtpDesc")}
+                {t("enterSecretDesc")}
               </p>
             </div>
 
-            {step === "email" ? (
-              <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-3"
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId} disabled={isLoadingTeams}>
+                  <SelectTrigger className={isRTL ? "text-right" : "text-left"}>
+                    <SelectValue placeholder={isLoadingTeams ? "..." : t("selectTeamToLogin")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {isRTL ? team.nameAr : team.nameEn}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={t("teamSecretPlaceholder")}
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  className="ps-10 text-center tracking-widest text-lg font-mono"
+                  dir="ltr"
+                  maxLength={6}
+                  data-testid="input-secret-key"
+                />
+              </div>
+
+              <Button
+                className="w-full gold-gradient border-amber-400/30 text-white font-bold"
+                onClick={handleLogin}
+                disabled={isLoading || !selectedTeamId || secretKey.length !== 6}
+                isLoading={isLoading}
+                data-testid="button-login-team"
               >
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder={t("emailPlaceholder")}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleRequestOtp()}
-                    className="ps-10"
-                    dir="ltr"
-                    data-testid="input-player-email"
-                  />
-                </div>
-                <Button
-                  className="w-full gold-gradient border-amber-400/30 text-white font-bold"
-                  onClick={handleRequestOtp}
-                  disabled={isLoading || !email.trim()}
-                  isLoading={isLoading}
-                  data-testid="button-request-otp"
-                >
-                  <span className={isRTL ? "font-arabic" : ""}>{t("sendOtp")}</span>
-                </Button>
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-3"
-              >
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-2" dir="ltr">{email}</p>
-                </div>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="000000"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    onKeyDown={(e) => e.key === "Enter" && handleVerifyOtp()}
-                    className="ps-10 text-center tracking-widest text-lg font-mono"
-                    dir="ltr"
-                    maxLength={6}
-                    data-testid="input-otp-code"
-                  />
-                </div>
-                <Button
-                  className="w-full gold-gradient border-amber-400/30 text-white font-bold"
-                  onClick={handleVerifyOtp}
-                  disabled={isLoading || otp.length !== 6}
-                  isLoading={isLoading}
-                  data-testid="button-verify-otp"
-                >
-                  <span className={isRTL ? "font-arabic" : ""}>{t("verifyOtp")}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => { setStep("email"); setOtp(""); }}
-                  data-testid="button-change-email"
-                >
-                  <span className={isRTL ? "font-arabic" : ""}>{t("changeEmail")}</span>
-                </Button>
-              </motion.div>
-            )}
+                <span className={isRTL ? "font-arabic" : ""}>{t("verifySecret")}</span>
+              </Button>
+            </motion.div>
 
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full mt-4"
               onClick={() => setLocation("/")}
               data-testid="button-back-login"
             >
