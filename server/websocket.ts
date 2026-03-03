@@ -34,7 +34,7 @@ function createDefaultGameState(): InMemoryGameState {
     phase: "idle",
     sessionId: null,
     totalQuestions: 31,
-    questionsPerTeam: 5,
+    questionsPerTeam: 7,
     teamOrder: [],
     teamPlayers: {},
     currentTeamIndex: 0,
